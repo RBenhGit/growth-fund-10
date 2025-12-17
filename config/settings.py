@@ -21,8 +21,16 @@ class Settings:
     OUTPUT_DIR = BASE_DIR / os.getenv("OUTPUT_DIRECTORY", "./Fund_Docs")
     CACHE_DIR = BASE_DIR / "cache"
 
-    # מקור נתונים
-    DATA_SOURCE = os.getenv("DATA_SOURCE", "investing")
+    # מקורות נתונים
+    # מקור לנתונים פיננסיים (דוחות כספיים, fundamentals)
+    FINANCIAL_DATA_SOURCE = os.getenv("FINANCIAL_DATA_SOURCE", "eodhd")
+    # מקור למחירים היסטוריים
+    PRICING_DATA_SOURCE = os.getenv("PRICING_DATA_SOURCE", "yfinance")
+
+    # Legacy: תמיכה לאחור - אם DATA_SOURCE מוגדר, השתמש בו לשני המקורות
+    if os.getenv("DATA_SOURCE"):
+        FINANCIAL_DATA_SOURCE = os.getenv("DATA_SOURCE")
+        PRICING_DATA_SOURCE = os.getenv("DATA_SOURCE")
 
     # Investing.com credentials
     INVESTING_EMAIL = os.getenv("INVESTING_EMAIL")
@@ -82,16 +90,43 @@ class Settings:
         Returns:
             bool: True אם ההגדרות תקינות
         """
-        if cls.DATA_SOURCE == "eodhd":
+        # בדיקת מקור נתונים פיננסיים
+        if cls.FINANCIAL_DATA_SOURCE == "eodhd":
             if not cls.EODHD_API_KEY:
                 raise ValueError(
-                    "EODHD_API_KEY must be set in .env when using EODHD"
+                    "EODHD_API_KEY must be set in .env when using EODHD for financial data"
                 )
 
-        if cls.DATA_SOURCE == "investing":
+        if cls.FINANCIAL_DATA_SOURCE == "fmp":
+            if not cls.FMP_API_KEY:
+                raise ValueError(
+                    "FMP_API_KEY must be set in .env when using FMP for financial data"
+                )
+
+        if cls.FINANCIAL_DATA_SOURCE == "investing":
             if not cls.INVESTING_EMAIL or not cls.INVESTING_PASSWORD:
                 raise ValueError(
                     "INVESTING_EMAIL and INVESTING_PASSWORD must be set in .env when using Investing.com"
+                )
+
+        if cls.FINANCIAL_DATA_SOURCE == "alphavantage":
+            if not cls.ALPHAVANTAGE_API_KEY:
+                raise ValueError(
+                    "ALPHAVANTAGE_API_KEY must be set in .env when using Alpha Vantage"
+                )
+
+        # בדיקת מקור מחירים
+        # yfinance לא דורש API key, אבל מקורות אחרים כן
+        if cls.PRICING_DATA_SOURCE == "eodhd":
+            if not cls.EODHD_API_KEY:
+                raise ValueError(
+                    "EODHD_API_KEY must be set in .env when using EODHD for pricing"
+                )
+
+        if cls.PRICING_DATA_SOURCE == "alphavantage":
+            if not cls.ALPHAVANTAGE_API_KEY:
+                raise ValueError(
+                    "ALPHAVANTAGE_API_KEY must be set in .env when using Alpha Vantage for pricing"
                 )
 
         # יצירת תיקיות אם לא קיימות

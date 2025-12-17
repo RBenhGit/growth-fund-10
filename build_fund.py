@@ -13,6 +13,7 @@ Usage:
 import argparse
 import sys
 import os
+import logging
 from pathlib import Path
 
 # Fix Windows console encoding for Hebrew
@@ -31,6 +32,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from config import settings
 from utils.date_utils import get_quarter_and_year, format_fund_name, get_current_date_string
+
+logger = logging.getLogger(__name__)
 
 # יצירת console עבור פלט יפה
 console = Console()
@@ -105,9 +108,29 @@ def save_stock_to_cache(stock, cache_dir):
         cache_dir: תיקיית cache
     """
     import json
+
     stock_cache = cache_dir / f"{stock.symbol.replace('.', '_')}.json"
-    with open(stock_cache, "w", encoding="utf-8") as f:
-        json.dump(stock.model_dump(), f, ensure_ascii=False, indent=2)
+
+    try:
+        # Log what we're about to save
+        logger.debug(f"Saving {stock.symbol}: base_score={stock.base_score}, potential_score={stock.potential_score}")
+
+        data = stock.model_dump()
+
+        # Verify scores are in the data
+        if stock.base_score is not None and data.get('base_score') is None:
+            logger.error(f"BUG: {stock.symbol} has base_score={stock.base_score} but model_dump() returned null!")
+        if stock.potential_score is not None and data.get('potential_score') is None:
+            logger.error(f"BUG: {stock.symbol} has potential_score={stock.potential_score} but model_dump() returned null!")
+
+        with open(stock_cache, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        logger.debug(f"✓ Successfully wrote {stock_cache.name} ({stock_cache.stat().st_size} bytes)")
+
+    except Exception as e:
+        logger.error(f"Failed to save {stock.symbol} to cache: {e}")
+        raise
 
 
 def get_base_company_name(stock):
@@ -301,6 +324,12 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                             market_data=market_data
                         )
 
+                        # Validate price_history for data quality
+                        if not market_data.price_history:
+                            logger.warning(f"No price history for {symbol} - momentum/valuation will be inaccurate")
+                        elif len(market_data.price_history) < 200:  # < ~1 year of trading days
+                            logger.warning(f"Insufficient price history for {symbol}: {len(market_data.price_history)} days")
+
                     all_loaded_stocks.append(stock)
 
                     # בדיקת כשירות ועדכון דגלים
@@ -332,8 +361,12 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
             ranked_base = builder.score_and_rank_base_stocks(builder.base_candidates)
 
             # עדכון cache עם ציונים
-            for stock in ranked_base:
+            logger.info(f"Step 3: Updating cache for {len(ranked_base)} base stocks...")
+            for i, stock in enumerate(ranked_base):
+                if settings.DEBUG_MODE and i < 5:  # Log first 5 in debug mode
+                    logger.debug(f"  Saving {stock.symbol} with base_score={stock.base_score}")
                 save_stock_to_cache(stock, cache_dir)
+            logger.info(f"Step 3: Cache update complete for {len(ranked_base)} stocks")
 
             console.print(f"  [green]✓[/green] דורגו {len(ranked_base)} מניות")
             progress.update(task3, completed=True)
@@ -384,8 +417,12 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
             ranked_potential = builder.score_and_rank_potential_stocks(builder.potential_candidates, index_pe)
 
             # עדכון cache עם ציונים
-            for stock in ranked_potential:
+            logger.info(f"Step 7: Updating cache for {len(ranked_potential)} potential stocks...")
+            for i, stock in enumerate(ranked_potential):
+                if settings.DEBUG_MODE and i < 5:  # Log first 5 in debug mode
+                    logger.debug(f"  Saving {stock.symbol} with potential_score={stock.potential_score}")
                 save_stock_to_cache(stock, cache_dir)
+            logger.info(f"Step 7: Cache update complete for {len(ranked_potential)} stocks")
 
             console.print(f"  [green]✓[/green] דורגו {len(ranked_potential)} מניות פוטנציאל")
             progress.update(task7, completed=True)
@@ -511,12 +548,63 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
             progress.update(task14, completed=True)
             raise RuntimeError(f"שלב 14 נכשל: {e}")
 
+        # ===== Verification: Check cache was updated with scores =====
+        console.print("[cyan]Verifying cache was updated with scores...[/cyan]")
+        sample_stocks = []
+        if builder.selected_base:
+            sample_stocks.append(builder.selected_base[0])
+        if builder.selected_potential:
+            sample_stocks.append(builder.selected_potential[0])
+
+        cache_verification_passed = True
+        for stock in sample_stocks:
+            stock_cache = cache_dir / f"{stock.symbol.replace('.', '_')}.json"
+            try:
+                with open(stock_cache, "r", encoding="utf-8") as f:
+                    cached_data = json.load(f)
+
+                memory_base = stock.base_score
+                memory_potential = stock.potential_score
+                cached_base = cached_data.get('base_score')
+                cached_potential = cached_data.get('potential_score')
+
+                # Check if in-memory score matches cached score
+                if memory_base is not None and cached_base is None:
+                    console.print(f"  [red]✗[/red] WARNING: {stock.symbol} has base_score in memory ({memory_base:.2f}) but not in cache!")
+                    logger.warning(f"Cache verification failed for {stock.symbol}: base_score not persisted")
+                    cache_verification_passed = False
+                elif memory_potential is not None and cached_potential is None:
+                    console.print(f"  [red]✗[/red] WARNING: {stock.symbol} has potential_score in memory ({memory_potential:.2f}) but not in cache!")
+                    logger.warning(f"Cache verification failed for {stock.symbol}: potential_score not persisted")
+                    cache_verification_passed = False
+                else:
+                    console.print(f"  [green]✓[/green] {stock.symbol} cache verified")
+            except Exception as e:
+                console.print(f"  [yellow]⚠[/yellow] Could not verify cache for {stock.symbol}: {e}")
+                logger.warning(f"Cache verification error for {stock.symbol}: {e}")
+
+        if not cache_verification_passed:
+            console.print("[yellow]⚠ Cache verification found issues - scores may not be persisted correctly[/yellow]")
+
     console.print("[green]✓[/green] בניית קרן הושלמה בהצלחה!")
     console.print(f"[yellow]מסמכים נשמרו ב:[/yellow] {output_dir}")
 
 
 def main():
     """פונקציה ראשית"""
+    # פרסור ארגומנטים (צריך להיות לפני הגדרת logging)
+    args = parse_arguments()
+
+    # Configure logging based on debug flag
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(levelname)s - %(name)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stderr)
+        ]
+    )
+
     # הדפסת כותרת
     console.print()
     console.print(Panel.fit(
@@ -526,12 +614,10 @@ def main():
     ))
     console.print()
 
-    # פרסור ארגומנטים
-    args = parse_arguments()
-
     # עדכון הגדרות לפי ארגומנטים
     if args.debug:
         settings.DEBUG_MODE = True
+        logger.info("Debug mode enabled")
 
     use_cache = settings.USE_CACHE and not args.no_cache
 

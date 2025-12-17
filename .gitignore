@@ -1,0 +1,61 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Cache directories
+cache/
+__pycache__/
+
+# Python bytecode
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Selenium
+chromedriver
+geckodriver
+*.crx
+
+# Temporary files
+*.tmp
+*.bak
+*.swp

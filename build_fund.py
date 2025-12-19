@@ -246,12 +246,12 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
     ))
 
     # יצירת data source
-    if settings.DATA_SOURCE == "eodhd":
+    if settings.FINANCIAL_DATA_SOURCE == "eodhd":
         data_source = EODHDDataSource()
-    elif settings.DATA_SOURCE == "fmp":
+    elif settings.FINANCIAL_DATA_SOURCE == "fmp":
         data_source = FMPDataSource()
     else:
-        raise ValueError(f"מקור נתונים לא נתמך: {settings.DATA_SOURCE}")
+        raise ValueError(f"מקור נתונים פיננסיים לא נתמך: {settings.FINANCIAL_DATA_SOURCE}")
 
     # בדיקת חיבור
     if not data_source.login():
@@ -641,7 +641,8 @@ def main():
     console.print(f"  רבעון: [cyan]{quarter}[/cyan]")
     console.print(f"  שנה: [cyan]{year}[/cyan]")
     console.print(f"  שימוש ב-cache: [cyan]{'כן' if use_cache else 'לא'}[/cyan]")
-    console.print(f"  מקור נתונים: [cyan]{settings.DATA_SOURCE}[/cyan]")
+    console.print(f"  נתונים פיננסיים: [cyan]{settings.FINANCIAL_DATA_SOURCE}[/cyan]")
+    console.print(f"  נתוני מחירים: [cyan]{settings.PRICING_DATA_SOURCE}[/cyan]")
     console.print()
 
     # בניית הקרן

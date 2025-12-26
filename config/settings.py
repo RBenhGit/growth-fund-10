@@ -41,9 +41,13 @@ class Settings:
 
     # Alpha Vantage API
     ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
+    ALPHAVANTAGE_RATE_LIMIT = os.getenv("ALPHAVANTAGE_RATE_LIMIT", "paid")
 
     # Financial Modeling Prep API
     FMP_API_KEY = os.getenv("FMP_API_KEY")
+
+    # TASE Data Hub API (Israel Stock Exchange - Official)
+    TASE_DATA_HUB_API_KEY = os.getenv("TASE_DATA_HUB_API_KEY")
 
     # הגדרות קרן
     FUND_QUARTER: Optional[str] = os.getenv("FUND_QUARTER") or None
@@ -113,6 +117,12 @@ class Settings:
             if not cls.ALPHAVANTAGE_API_KEY:
                 raise ValueError(
                     "ALPHAVANTAGE_API_KEY must be set in .env when using Alpha Vantage"
+                )
+
+        if cls.FINANCIAL_DATA_SOURCE == "tase_data_hub":
+            if not cls.TASE_DATA_HUB_API_KEY:
+                raise ValueError(
+                    "TASE_DATA_HUB_API_KEY must be set in .env when using TASE Data Hub"
                 )
 
         # בדיקת מקור מחירים

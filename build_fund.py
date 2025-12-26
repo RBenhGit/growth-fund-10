@@ -234,8 +234,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
     import json
     import os
     from pathlib import Path
-    from data_sources.eodhd_api import EODHDDataSource
-    from data_sources.fmp_api import FMPDataSource
+    from data_sources.router import DataSourceRouter
     from models import Stock, Fund, FundPosition
     from fund_builder import FundBuilder
     from rich.table import Table
@@ -245,13 +244,13 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         border_style="cyan"
     ))
 
-    # יצירת data source
-    if settings.FINANCIAL_DATA_SOURCE == "eodhd":
-        data_source = EODHDDataSource()
-    elif settings.FINANCIAL_DATA_SOURCE == "fmp":
-        data_source = FMPDataSource()
-    else:
-        raise ValueError(f"מקור נתונים פיננסיים לא נתמך: {settings.FINANCIAL_DATA_SOURCE}")
+    # יצירת data source עם ניתוב חכם
+    router = DataSourceRouter()
+    data_source = router.get_data_source(index_name)
+
+    # הצגת מקור הנתונים שנבחר
+    source_name = data_source.__class__.__name__
+    console.print(f"[yellow]מקור נתונים:[/yellow] {source_name}")
 
     # בדיקת חיבור
     if not data_source.login():

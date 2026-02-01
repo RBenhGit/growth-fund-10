@@ -578,9 +578,33 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         task12 = progress.add_task("[cyan]שלב 12: יצירת מסמך עדכון...", total=None)
         try:
             update_doc_path = output_dir / f"{fund_name}_Update.md"
+
+            # חישוב סטטיסטיקות סינון
+            total_stocks = len(constituents)
+            num_base_eligible = len(base_eligible)
+            num_potential_eligible = len(potential_eligible)
+            # מניות שלא עברו אף סינון (לא בסיס ולא פוטנציאל)
+            num_rejected = total_stocks - len([
+                s for s in all_loaded_stocks
+                if s.is_eligible_for_base or s.is_eligible_for_potential
+            ])
+            pct = lambda n: f"{n / total_stocks * 100:.1f}%" if total_stocks > 0 else "0%"
+
+            stats_table = (
+                "## סטטיסטיקות סינון\n\n"
+                "| מדד | מספר | אחוז |\n"
+                "|-----|------|------|\n"
+                f"| סה\"כ מניות במדד | {total_stocks} | 100% |\n"
+                f"| כשירות לבסיס | {num_base_eligible} | {pct(num_base_eligible)} |\n"
+                f"| כשירות לפוטנציאל | {num_potential_eligible} | {pct(num_potential_eligible)} |\n"
+                f"| נדחו (לא עברו סינון) | {num_rejected} | {pct(num_rejected)} |\n"
+                "\n"
+            )
+
             with open(update_doc_path, "w", encoding="utf-8") as f:
                 f.write(f"# עדכון קרן {fund_name}\n\n")
                 f.write(f"תאריך עדכון: {get_current_date_string()}\n\n")
+                f.write(stats_table)
                 f.write("## מניות בסיס מדורגות\n\n")
                 f.write("| דירוג | שם חברה | סימול | ציון |\n")
                 f.write("|-------|---------|-------|------|\n")
@@ -607,6 +631,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                 f.write(f"# {fund_name}\n\n")
                 f.write(f"תאריך יצירה: {get_current_date_string()}\n\n")
                 f.write(f"מדד: {index_name}\n\n")
+                f.write(stats_table)
                 f.write(fund.to_markdown())
                 f.write(f"\n**עלות מינימלית ליחידת קרן:** {min_cost:,.2f}\n")
             console.print(f"  [green]✓[/green] נוצר מסמך סופי: {final_doc_path.name}")

@@ -5,6 +5,7 @@ from .eodhd_api import EODHDDataSource
 from .fmp_api import FMPDataSource
 from .tase_data_hub_api import TASEDataHubSource
 from .alphavantage_api import AlphaVantageSource
+from .twelvedata_api import TwelveDataSource
 from .router import DataSourceRouter
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "FMPDataSource",
     "TASEDataHubSource",
     "AlphaVantageSource",
+    "TwelveDataSource",
     "DataSourceRouter"
 ]

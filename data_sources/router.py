@@ -10,6 +10,7 @@ from .eodhd_api import EODHDDataSource
 from .fmp_api import FMPDataSource
 from .tase_data_hub_api import TASEDataHubSource
 from .alphavantage_api import AlphaVantageSource
+from .twelvedata_api import TwelveDataSource
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -117,5 +118,7 @@ class DataSourceRouter:
             return TASEDataHubSource()
         elif source_name == "alphavantage":
             return AlphaVantageSource()
+        elif source_name == "twelvedata":
+            return TwelveDataSource()
         else:
             raise ValueError(f"מקור נתונים לא מוכר: {source_name}")

@@ -23,9 +23,9 @@ class Settings:
 
     # מקורות נתונים
     # מקור לנתונים פיננסיים (דוחות כספיים, fundamentals)
-    FINANCIAL_DATA_SOURCE = os.getenv("FINANCIAL_DATA_SOURCE", "eodhd")
+    FINANCIAL_DATA_SOURCE = os.getenv("FINANCIAL_DATA_SOURCE", "twelvedata")
     # מקור למחירים היסטוריים
-    PRICING_DATA_SOURCE = os.getenv("PRICING_DATA_SOURCE", "yfinance")
+    PRICING_DATA_SOURCE = os.getenv("PRICING_DATA_SOURCE", "twelvedata")
 
     # Legacy: תמיכה לאחור - אם DATA_SOURCE מוגדר, השתמש בו לשני המקורות
     if os.getenv("DATA_SOURCE"):
@@ -45,6 +45,9 @@ class Settings:
 
     # Financial Modeling Prep API
     FMP_API_KEY = os.getenv("FMP_API_KEY")
+
+    # Twelve Data API
+    TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 
     # TASE Data Hub API (Israel Stock Exchange - Official)
     TASE_DATA_HUB_API_KEY = os.getenv("TASE_DATA_HUB_API_KEY")
@@ -125,6 +128,12 @@ class Settings:
                     "TASE_DATA_HUB_API_KEY must be set in .env when using TASE Data Hub"
                 )
 
+        if cls.FINANCIAL_DATA_SOURCE == "twelvedata":
+            if not cls.TWELVEDATA_API_KEY:
+                raise ValueError(
+                    "TWELVEDATA_API_KEY must be set in .env when using Twelve Data"
+                )
+
         # בדיקת מקור מחירים
         # yfinance לא דורש API key, אבל מקורות אחרים כן
         if cls.PRICING_DATA_SOURCE == "eodhd":
@@ -137,6 +146,12 @@ class Settings:
             if not cls.ALPHAVANTAGE_API_KEY:
                 raise ValueError(
                     "ALPHAVANTAGE_API_KEY must be set in .env when using Alpha Vantage for pricing"
+                )
+
+        if cls.PRICING_DATA_SOURCE == "twelvedata":
+            if not cls.TWELVEDATA_API_KEY:
+                raise ValueError(
+                    "TWELVEDATA_API_KEY must be set in .env when using Twelve Data for pricing"
                 )
 
         # יצירת תיקיות אם לא קיימות

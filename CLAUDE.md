@@ -138,61 +138,115 @@ POTENTIAL_SCORE_WEIGHTS = {
 
 ## Data Sources
 
-The system uses **separate data sources** for different types of data:
-- **Financial Data** (fundamentals, financial statements, ratios)
-- **Pricing Data** (historical prices, market data)
+The system uses a **2x2 configuration matrix** for maximum flexibility:
+- **Market dimension**: US stocks (SP500) vs Israeli stocks (TASE125)
+- **Data type dimension**: Financial data (fundamentals) vs Pricing data (market prices)
 
-### Default Configuration (Recommended)
-- **Financial Data**: EODHD API
-- **Pricing Data**: yfinance (Yahoo Finance)
+This allows you to optimize for cost and quality by mixing different APIs. For example:
+- Use **FMP** for US fundamentals + **yfinance** for all pricing (saves money)
+- Use **TASE Data Hub** for Israeli fundamentals (most accurate) + **yfinance** for pricing
 
-This combination provides the best balance of data quality, coverage, and cost.
+### Configuration Matrix
+
+```
+              Financial Data          Pricing Data
+US (SP500)    [Configurable API]     [Configurable API]
+TASE (125)    [Configurable API]     [Configurable API]
+```
+
+Configure via `.env`:
+- `US_FINANCIAL_DATA_SOURCE` - US stock fundamentals
+- `US_PRICING_DATA_SOURCE` - US stock prices
+- `TASE_FINANCIAL_DATA_SOURCE` - Israeli stock fundamentals
+- `TASE_PRICING_DATA_SOURCE` - Israeli stock prices
 
 ### Available Data Sources
 
-#### For Financial Data (FINANCIAL_DATA_SOURCE)
+| Source | TASE | US | Cost | Rate Limit | Best For |
+|--------|------|-----|------|------------|----------|
+| **EODHD** | ✓ | ✓ | $80/mo | High | Production (all-in-one) |
+| **TASE Data Hub** | ✓ | ✗ | Free/Paid | Medium | Israeli fundamentals (official) |
+| **FMP** | ✗ | ✓ | Free tier | 250/day | US fundamentals (budget) |
+| **Alpha Vantage** | ✗ | ✓ | Free tier | 25/day | Light usage |
+| **yfinance** | ✓ | ✓ | FREE | Unlimited | Pricing data (recommended) |
+| **Investing.com** | ✓ | ✓ | Pro req. | Slow | Not recommended |
 
-1. **eodhd** - EOD Historical Data API (recommended)
-   - Requires: `EODHD_API_KEY`
-   - Supports both TASE (Israeli) and US stocks
-   - Provides fundamentals, historical prices, and financial statements
-   - Test with: `python test_eodhd.py`
+#### 1. EODHD (EOD Historical Data)
+- **Type**: Financial + Pricing
+- **Markets**: US, TASE, Global
+- **Key**: `EODHD_API_KEY`
+- **Best for**: All-in-one solution
+- **Test**: `python test_eodhd.py`
 
-2. **fmp** - Financial Modeling Prep API
-   - Requires: `FMP_API_KEY`
-   - Free tier: 500 requests/day (limited endpoints)
-   - Supports US stocks and some international markets
-   - Test with: `python test_fmp.py`
+#### 2. FMP (Financial Modeling Prep)
+- **Type**: Financial only
+- **Markets**: US stocks
+- **Key**: `FMP_API_KEY`
+- **Free tier**: 250 requests/day
+- **Best for**: US fundamentals on budget
+- **Test**: `python test_fmp.py`
 
-3. **investing** - Investing.com via Selenium
-   - Requires: `INVESTING_EMAIL` and `INVESTING_PASSWORD` (Pro account)
-   - Currently implemented in [data_sources/investing_scraper.py](data_sources/investing_scraper.py)
-   - Test with: `python test_investing.py`
+#### 3. TASE Data Hub
+- **Type**: Financial only
+- **Markets**: Israeli stocks (TA-125)
+- **Key**: `TASE_DATA_HUB_API_KEY`
+- **Best for**: Most accurate Israeli fundamentals (official exchange API)
+- **Note**: Uses yfinance fallback for pricing
 
-4. **alphavantage** - Alpha Vantage API
-   - Requires: `ALPHAVANTAGE_API_KEY`
-   - Free tier: 25 requests/day
-   - US stocks only
+#### 4. Alpha Vantage
+- **Type**: Financial + Pricing
+- **Markets**: US stocks only
+- **Key**: `ALPHAVANTAGE_API_KEY`
+- **Free tier**: 25 requests/day (very limited)
+- **Best for**: Light usage, testing
 
-5. **csv** - Manual CSV file input (future)
-   - For manual data entry workflows
+#### 5. yfinance (Yahoo Finance)
+- **Type**: Pricing only (limited fundamentals)
+- **Markets**: US, TASE, Global
+- **Key**: None (free, no API key needed)
+- **Best for**: All pricing data (highly recommended)
+- **Note**: Unlimited requests, very reliable
 
-#### For Pricing Data (PRICING_DATA_SOURCE)
+#### 6. Investing.com (Web Scraper)
+- **Type**: Financial + Pricing
+- **Markets**: US, TASE, Global
+- **Credentials**: `INVESTING_EMAIL`, `INVESTING_PASSWORD`
+- **Best for**: Not recommended (slow, brittle)
 
-1. **yfinance** - Yahoo Finance (recommended)
-   - No API key required
-   - Free and reliable
-   - Excellent coverage for both US and international markets
-   - Provides real-time and historical price data
+### Recommended Configurations
 
-2. **eodhd** - EOD Historical Data API
-   - Requires: `EODHD_API_KEY`
-   - Use if you already have EODHD for financial data
+#### Optimal (Best Quality, Low Cost)
+```bash
+US_FINANCIAL_DATA_SOURCE=fmp
+US_PRICING_DATA_SOURCE=yfinance          # Free!
+TASE_FINANCIAL_DATA_SOURCE=tase_data_hub
+TASE_PRICING_DATA_SOURCE=yfinance        # Free!
+```
 
-3. **alphavantage** - Alpha Vantage API
-   - Requires: `ALPHAVANTAGE_API_KEY`
-   - Free tier: 25 requests/day
-   - US stocks only
+#### Universal (One API for Everything)
+```bash
+US_FINANCIAL_DATA_SOURCE=eodhd
+US_PRICING_DATA_SOURCE=eodhd
+TASE_FINANCIAL_DATA_SOURCE=eodhd
+TASE_PRICING_DATA_SOURCE=eodhd
+```
+
+#### Free Tier (Testing Only)
+```bash
+US_FINANCIAL_DATA_SOURCE=fmp             # 250 req/day
+US_PRICING_DATA_SOURCE=yfinance          # Unlimited
+TASE_FINANCIAL_DATA_SOURCE=              # Auto-select
+TASE_PRICING_DATA_SOURCE=yfinance        # Unlimited
+```
+
+### Auto-Selection Fallback Chains
+
+If you leave a source blank, the router auto-selects from these chains:
+
+- **US Financial**: fmp → alphavantage → eodhd
+- **US Pricing**: yfinance → eodhd → alphavantage
+- **TASE Financial**: tase_data_hub → eodhd
+- **TASE Pricing**: yfinance → eodhd
 
 ### Data Source Priority
 
@@ -200,6 +254,84 @@ Per [Fund_Update_Instructions.md](Fund_Update_Instructions.md:19-49):
 - **Official sources first**: SEC EDGAR (US), TASE/Maya (Israel)
 - **Backup sources**: Investing.com, Yahoo Finance, Google Finance
 - Always document which source was used for each data point
+
+### Testing Your Configuration
+
+After setting up your `.env` file, test all configured sources:
+
+```bash
+python tests/test_all_sources.py
+```
+
+This will verify:
+- API keys are valid
+- Sources implement the correct interface
+- Data returned is valid and complete
+- Router correctly selects sources
+
+### Troubleshooting
+
+#### Problem: `AttributeError: 'FMPDataSource' object has no attribute 'get_stock_data'`
+
+**Solution**: You're using an old version. All sources now implement `get_stock_data()`. Update your code.
+
+#### Problem: `DataSourceAuthenticationError: Invalid API key`
+
+**Solution**:
+1. Check your `.env` file for the correct API key
+2. Verify the key is active on the provider's website
+3. Ensure no extra spaces or quotes around the key
+
+#### Problem: `DataSourceRateLimitError: Rate limit exceeded`
+
+**Solution**:
+1. **Immediate**: Use cached data with `--no-cache` flag removed
+2. **Short-term**: Wait for rate limit to reset (check provider docs)
+3. **Long-term**: Switch to a different source or upgrade your plan
+
+Example - switch from Alpha Vantage to FMP:
+```bash
+# In .env
+US_FINANCIAL_DATA_SOURCE=fmp  # Changed from alphavantage
+```
+
+#### Problem: Different sources give different financial data
+
+**Solution**: This is normal. APIs update at different times and may use different accounting standards.
+
+To compare sources for debugging:
+```python
+from data_sources.adapter import DataSourceAdapter
+
+adapter = DataSourceAdapter()
+comparison = adapter.compare_sources(
+    symbol="AAPL",
+    data1=fmp_data,
+    source1="FMP",
+    data2=eodhd_data,
+    source2="EODHD"
+)
+print(comparison)
+```
+
+Acceptable variances:
+- Price: ±2%
+- Market cap: ±5%
+- Revenue/income: ±10% (due to fiscal year differences)
+
+#### Problem: `ValueError: No financial data source available for SP500`
+
+**Solution**: No API keys are configured or available.
+
+1. Check which keys you have in `.env`
+2. Configure at least one source for that market
+3. Test the source: `python test_fmp.py` (or test_eodhd.py, etc.)
+
+Example fix:
+```bash
+# Add to .env
+FMP_API_KEY=your-key-here
+```
 
 ## Important Implementation Notes
 
@@ -242,38 +374,45 @@ The [investing_scraper.py](data_sources/investing_scraper.py:52-81) uses:
 
 ## Configuration
 
-Create a `.env` file in the project root (see [.env](.env) for template):
+Create a `.env` file in the project root (see [.env.template](.env.template) for full template):
 
 ```bash
 # ====================================================================
-# Data Source Configuration
+# Advanced Data Source Configuration (2x2 Matrix)
 # ====================================================================
-# Separate data sources for financial data and pricing data
 
-# Financial data source (fundamentals, financial statements)
-# Options: eodhd (recommended), fmp, investing, alphavantage, csv
-FINANCIAL_DATA_SOURCE=eodhd
+# US stocks (S&P 500) - Financial data
+# Options: fmp, alphavantage, eodhd
+# Leave blank for auto-selection
+US_FINANCIAL_DATA_SOURCE=fmp
 
-# Pricing data source (historical prices, market data)
-# Options: yfinance (recommended - free, no API key), eodhd, alphavantage
-PRICING_DATA_SOURCE=yfinance
+# US stocks (S&P 500) - Pricing data
+# Options: yfinance, eodhd, alphavantage
+# Recommended: yfinance (free!)
+US_PRICING_DATA_SOURCE=yfinance
+
+# Israeli stocks (TA-125) - Financial data
+# Options: tase_data_hub, eodhd, investing
+# Leave blank for auto-selection
+TASE_FINANCIAL_DATA_SOURCE=tase_data_hub
+
+# Israeli stocks (TA-125) - Pricing data
+# Options: yfinance, eodhd, investing
+# Recommended: yfinance (free!)
+TASE_PRICING_DATA_SOURCE=yfinance
 
 # ====================================================================
 # API Keys
 # ====================================================================
 
-# EOD Historical Data API (recommended - supports TASE + US)
-EODHD_API_KEY=your-api-key-here
+EODHD_API_KEY=your-key-here
+FMP_API_KEY=your-key-here
+TASE_DATA_HUB_API_KEY=your-key-here
+ALPHAVANTAGE_API_KEY=your-key-here
 
-# Financial Modeling Prep API
-FMP_API_KEY=your-api-key-here
-
-# Investing.com credentials (if using investing source)
+# Investing.com (not recommended)
 INVESTING_EMAIL=your-email@example.com
 INVESTING_PASSWORD=your-password
-
-# Alpha Vantage API (US stocks only)
-ALPHAVANTAGE_API_KEY=your-api-key-here
 
 # ====================================================================
 # Fund Parameters (auto-calculated if blank)
@@ -289,8 +428,20 @@ USE_CACHE=true
 DEBUG_MODE=false
 ```
 
-### Note on Legacy Configuration
-For backwards compatibility, if you set `DATA_SOURCE` in your `.env` file, it will be used for both financial and pricing data. However, the recommended approach is to use the separate `FINANCIAL_DATA_SOURCE` and `PRICING_DATA_SOURCE` settings for better flexibility.
+### Legacy Configuration (Backwards Compatible)
+
+For simpler configuration, you can still use the old variables:
+
+```bash
+# These work but are less flexible than the 2x2 matrix above
+FINANCIAL_DATA_SOURCE=eodhd  # Used for both US and TASE
+PRICING_DATA_SOURCE=yfinance  # Used for both US and TASE
+
+# Even older - used for everything:
+DATA_SOURCE=eodhd
+```
+
+The system automatically falls back to these legacy settings if the 2x2 matrix is not configured.
 
 ## Future Development Areas
 

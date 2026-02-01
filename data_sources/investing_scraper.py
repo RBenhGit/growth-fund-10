@@ -381,6 +381,23 @@ class InvestingScraper(BaseDataSource):
         logger.warning(f"Index P/E fetching not fully implemented yet for {index_name}")
         return 25.0
 
+    def get_stock_data(self, symbol: str, years: int = 5) -> tuple[FinancialData, MarketData]:
+        """
+        שליפת כל נתוני המניה - מתודה מאוחדת
+
+        Note: רוב המתודות של InvestingScraper עדיין לא מומשו (TODO).
+
+        Args:
+            symbol: סימול המניה
+            years: מספר שנים לשלוף
+
+        Returns:
+            tuple[FinancialData, MarketData]: נתונים פיננסיים ונתוני שוק
+        """
+        financial_data = self.get_stock_financials(symbol, years)
+        market_data = self.get_stock_market_data(symbol)
+        return financial_data, market_data
+
     def __enter__(self):
         """Context manager entry"""
         self.login()

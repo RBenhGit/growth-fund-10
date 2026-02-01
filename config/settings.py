@@ -27,10 +27,56 @@ class Settings:
     # מקור למחירים היסטוריים
     PRICING_DATA_SOURCE = os.getenv("PRICING_DATA_SOURCE", "twelvedata")
 
-    # Legacy: תמיכה לאחור - אם DATA_SOURCE מוגדר, השתמש בו לשני המקורות
+    # ====================================================================
+    # Advanced Data Source Configuration (2x2 Matrix)
+    # ====================================================================
+    # Configure SEPARATE data sources for:
+    #   - US stocks (SP500) vs Israeli stocks (TASE125)
+    #   - Financial data (fundamentals) vs Pricing data (market prices)
+
+    # US Stocks (SP500) - Financial Data
+    # Options: fmp, alphavantage, eodhd
+    US_FINANCIAL_DATA_SOURCE = os.getenv("US_FINANCIAL_DATA_SOURCE", "")
+
+    # US Stocks (SP500) - Pricing Data
+    # Options: yfinance, eodhd, alphavantage
+    US_PRICING_DATA_SOURCE = os.getenv("US_PRICING_DATA_SOURCE", "yfinance")
+
+    # TASE Stocks (TA-125) - Financial Data
+    # Options: tase_data_hub, eodhd, investing
+    TASE_FINANCIAL_DATA_SOURCE = os.getenv("TASE_FINANCIAL_DATA_SOURCE", "")
+
+    # TASE Stocks (TA-125) - Pricing Data
+    # Options: yfinance, eodhd, investing
+    TASE_PRICING_DATA_SOURCE = os.getenv("TASE_PRICING_DATA_SOURCE", "yfinance")
+
+    # ====================================================================
+    # Fallback to Legacy Configuration (Backwards Compatibility)
+    # ====================================================================
+
+    # If old FINANCIAL_DATA_SOURCE is set, use it for both markets
+    if os.getenv("FINANCIAL_DATA_SOURCE"):
+        legacy_source = os.getenv("FINANCIAL_DATA_SOURCE")
+        US_FINANCIAL_DATA_SOURCE = US_FINANCIAL_DATA_SOURCE or legacy_source
+        TASE_FINANCIAL_DATA_SOURCE = TASE_FINANCIAL_DATA_SOURCE or legacy_source
+
+    # If old PRICING_DATA_SOURCE is set, use it for both markets
+    if os.getenv("PRICING_DATA_SOURCE"):
+        legacy_pricing = os.getenv("PRICING_DATA_SOURCE")
+        US_PRICING_DATA_SOURCE = US_PRICING_DATA_SOURCE or legacy_pricing
+        TASE_PRICING_DATA_SOURCE = TASE_PRICING_DATA_SOURCE or legacy_pricing
+
+    # Even older legacy: DATA_SOURCE for everything
     if os.getenv("DATA_SOURCE"):
-        FINANCIAL_DATA_SOURCE = os.getenv("DATA_SOURCE")
-        PRICING_DATA_SOURCE = os.getenv("DATA_SOURCE")
+        legacy_all = os.getenv("DATA_SOURCE")
+        US_FINANCIAL_DATA_SOURCE = US_FINANCIAL_DATA_SOURCE or legacy_all
+        US_PRICING_DATA_SOURCE = US_PRICING_DATA_SOURCE or legacy_all
+        TASE_FINANCIAL_DATA_SOURCE = TASE_FINANCIAL_DATA_SOURCE or legacy_all
+        TASE_PRICING_DATA_SOURCE = TASE_PRICING_DATA_SOURCE or legacy_all
+
+    # Keep legacy variables for backwards compatibility
+    FINANCIAL_DATA_SOURCE = US_FINANCIAL_DATA_SOURCE or TASE_FINANCIAL_DATA_SOURCE or "eodhd"
+    PRICING_DATA_SOURCE = US_PRICING_DATA_SOURCE or "yfinance"
 
     # Investing.com credentials
     INVESTING_EMAIL = os.getenv("INVESTING_EMAIL")
@@ -161,6 +207,45 @@ class Settings:
         (cls.CACHE_DIR / "index_constituents").mkdir(exist_ok=True)
 
         return True
+
+    @classmethod
+    def validate_source_configuration(cls):
+        """
+        אימות תצורת מקורות נתונים מתקדמת (מטריצה 2x2)
+
+        בודק שמפתחות API נדרשים קיימים עבור מקורות שהוגדרו.
+
+        Raises:
+            ValueError: אם חסרים מפתחות API נדרשים
+        """
+        sources_needed = set()
+
+        # אסוף את כל המקורות המוגדרים
+        if cls.US_FINANCIAL_DATA_SOURCE:
+            sources_needed.add(cls.US_FINANCIAL_DATA_SOURCE)
+        if cls.US_PRICING_DATA_SOURCE and cls.US_PRICING_DATA_SOURCE != "yfinance":
+            sources_needed.add(cls.US_PRICING_DATA_SOURCE)
+        if cls.TASE_FINANCIAL_DATA_SOURCE:
+            sources_needed.add(cls.TASE_FINANCIAL_DATA_SOURCE)
+        if cls.TASE_PRICING_DATA_SOURCE and cls.TASE_PRICING_DATA_SOURCE != "yfinance":
+            sources_needed.add(cls.TASE_PRICING_DATA_SOURCE)
+
+        # בדוק מפתחות API עבור כל מקור
+        missing = []
+        for source in sources_needed:
+            if source == "eodhd" and not cls.EODHD_API_KEY:
+                missing.append(f"{source} requires EODHD_API_KEY")
+            elif source == "fmp" and not cls.FMP_API_KEY:
+                missing.append(f"{source} requires FMP_API_KEY")
+            elif source == "tase_data_hub" and not cls.TASE_DATA_HUB_API_KEY:
+                missing.append(f"{source} requires TASE_DATA_HUB_API_KEY")
+            elif source == "alphavantage" and not cls.ALPHAVANTAGE_API_KEY:
+                missing.append(f"{source} requires ALPHAVANTAGE_API_KEY")
+            elif source == "investing" and not (cls.INVESTING_EMAIL and cls.INVESTING_PASSWORD):
+                missing.append(f"{source} requires INVESTING_EMAIL and INVESTING_PASSWORD")
+
+        if missing:
+            raise ValueError(f"Missing API keys:\n  - " + "\n  - ".join(missing))
 
 
 # יצירת instance יחיד

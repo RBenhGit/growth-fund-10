@@ -235,6 +235,14 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
     import os
     from pathlib import Path
     from data_sources.router import DataSourceRouter
+    from data_sources.adapter import DataSourceAdapter
+    from data_sources.exceptions import (
+        DataSourceError,
+        DataSourceConnectionError,
+        DataSourceAuthenticationError,
+        DataSourceRateLimitError,
+        DataSourceNotFoundError
+    )
     from models import Stock, Fund, FundPosition
     from fund_builder import FundBuilder
     from rich.table import Table
@@ -244,17 +252,60 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         border_style="cyan"
     ))
 
-    # יצירת data source עם ניתוב חכם
+    # יצירת data sources עם ניתוב חכם - מקורות נפרדים לנתונים פיננסיים ומחירים
     router = DataSourceRouter()
-    data_source = router.get_data_source(index_name)
+    adapter = DataSourceAdapter()
 
-    # הצגת מקור הנתונים שנבחר
-    source_name = data_source.__class__.__name__
-    console.print(f"[yellow]מקור נתונים:[/yellow] {source_name}")
+    try:
+        financial_source = router.get_financial_source(index_name)
+        pricing_source = router.get_pricing_source(index_name)
+    except ValueError as e:
+        console.print(f"[bold red]❌ שגיאת הגדרה:[/bold red] {e}")
+        console.print("\n[yellow]אנא הגדר מפתחות API בקובץ .env[/yellow]")
+        sys.exit(1)
 
-    # בדיקת חיבור
-    if not data_source.login():
-        raise RuntimeError("לא ניתן להתחבר למקור הנתונים")
+    financial_source_name = financial_source.__class__.__name__
+    pricing_source_name = pricing_source.__class__.__name__
+
+    # הצגת הגדרות מקורות הנתונים
+    console.print(Panel(
+        f"[bold cyan]הגדרות מקורות נתונים[/bold cyan]\n\n"
+        f"מדד: [yellow]{index_name}[/yellow]\n"
+        f"מקור נתונים פיננסיים: [yellow]{financial_source_name}[/yellow]\n"
+        f"מקור נתוני מחירים: [yellow]{pricing_source_name}[/yellow]\n"
+        f"שימוש ב-cache: [yellow]{'מופעל' if use_cache else 'כבוי'}[/yellow]",
+        border_style="cyan"
+    ))
+
+    # בדיקת חיבור למקורות נתונים
+    console.print("\n[bold cyan]בודק חיבור למקורות נתונים...[/bold cyan]")
+
+    try:
+        if not financial_source.login():
+            raise DataSourceConnectionError(f"לא ניתן להתחבר למקור נתונים פיננסיים: {financial_source_name}")
+        console.print(f"[green]✓ מחובר ל-{financial_source_name} (נתונים פיננסיים)[/green]")
+    except DataSourceAuthenticationError as e:
+        console.print(f"[bold red]❌ שגיאת אימות:[/bold red] {e}")
+        console.print("\n[yellow]אנא בדוק את מפתח ה-API בקובץ .env[/yellow]")
+        sys.exit(1)
+    except DataSourceConnectionError as e:
+        console.print(f"[bold red]❌ שגיאת התחברות:[/bold red] {e}")
+        console.print("\n[yellow]אנא בדוק את החיבור לאינטרנט[/yellow]")
+        sys.exit(1)
+    except DataSourceError as e:
+        console.print(f"[bold red]❌ שגיאת מקור נתונים:[/bold red] {e}")
+        sys.exit(1)
+
+    # בדיקת חיבור למקור מחירים (רק אם שונה ממקור הנתונים הפיננסיים)
+    if pricing_source_name != financial_source_name:
+        try:
+            if not pricing_source.login():
+                raise DataSourceConnectionError(f"לא ניתן להתחבר למקור נתוני מחירים: {pricing_source_name}")
+            console.print(f"[green]✓ מחובר ל-{pricing_source_name} (נתוני מחירים)[/green]")
+        except DataSourceError as e:
+            console.print(f"[yellow]⚠ אזהרה:[/yellow] לא ניתן להתחבר למקור מחירים: {e}")
+            console.print(f"[yellow]ממשיך עם מקור הנתונים הפיננסיים בלבד[/yellow]")
+            pricing_source = financial_source  # Fallback to financial source
 
     builder = FundBuilder(index_name)
     fund_name = format_fund_name(quarter, year, index_name)
@@ -282,7 +333,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                     constituents = json.load(f)
                 console.print(f"  [green]✓[/green] נטענו {len(constituents)} מניות מ-cache")
             else:
-                constituents = data_source.get_index_constituents(index_name)
+                constituents = financial_source.get_index_constituents(index_name)
                 with open(constituents_cache, "w", encoding="utf-8") as f:
                     json.dump(constituents, f, ensure_ascii=False, indent=2)
                 console.print(f"  [green]✓[/green] נמצאו {len(constituents)} מניות במדד")
@@ -313,8 +364,47 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                             data = json.load(f)
                             stock = Stock(**data)
                     else:
-                        # שימוש בקריאה מאוחדת - 2 EODHD API calls + yfinance
-                        financial_data, market_data = data_source.get_stock_data(symbol, years=5)
+                        # שליפה ממקורות נפרדים - נתונים פיננסיים ומחירים
+                        logger.info(
+                            f"שולף נתוני {symbol}: "
+                            f"פיננסיים מ-{financial_source_name}, "
+                            f"מחירים מ-{pricing_source_name}"
+                        )
+
+                        # שליפת נתונים פיננסיים
+                        try:
+                            financial_data = financial_source.get_stock_financials(symbol, years=5)
+                        except DataSourceNotFoundError:
+                            logger.warning(f"מניה {symbol} לא נמצאה ב-{financial_source_name}, מדלג")
+                            continue
+                        except DataSourceRateLimitError as e:
+                            logger.error(f"הגעת למגבלת קריאות API: {e}")
+                            console.print(
+                                f"[yellow]⚠ הגעת למגבלת קריאות API של {financial_source_name}[/yellow]\n"
+                                "[yellow]שקול להשתמש בנתונים שנשמרו ב-cache או להמתין[/yellow]"
+                            )
+                            raise
+
+                        # תיקוף נתונים פיננסיים
+                        if not adapter.validate_financial_data(financial_data, symbol, financial_source_name):
+                            logger.error(f"נתונים פיננסיים לא תקינים עבור {symbol}, מדלג")
+                            continue
+
+                        # שליפת נתוני מחירים
+                        try:
+                            market_data = pricing_source.get_stock_market_data(symbol)
+                        except DataSourceNotFoundError:
+                            logger.warning(f"נתוני מחירים עבור {symbol} לא נמצאו ב-{pricing_source_name}, מדלג")
+                            continue
+                        except DataSourceError as e:
+                            logger.warning(f"שגיאה בשליפת נתוני מחירים עבור {symbol}: {e}")
+                            # ממשיך בלי נתוני מחירים - ייתכן שהמניה תיפסל
+
+                        # תיקוף נתוני שוק
+                        if not adapter.validate_market_data(market_data, symbol, pricing_source_name):
+                            logger.warning(f"נתוני מחירים חלקיים עבור {symbol} - ציון momentum/valuation עלול להיות לא מדויק")
+
+                        # יצירת אובייקט המניה
                         stock = Stock(
                             symbol=symbol,
                             name=constituent["name"],
@@ -322,12 +412,6 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                             financial_data=financial_data,
                             market_data=market_data
                         )
-
-                        # Validate price_history for data quality
-                        if not market_data.price_history:
-                            logger.warning(f"No price history for {symbol} - momentum/valuation will be inaccurate")
-                        elif len(market_data.price_history) < 200:  # < ~1 year of trading days
-                            logger.warning(f"Insufficient price history for {symbol}: {len(market_data.price_history)} days")
 
                     all_loaded_stocks.append(stock)
 

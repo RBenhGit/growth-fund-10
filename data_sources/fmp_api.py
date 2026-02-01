@@ -235,3 +235,20 @@ class FMPDataSource(BaseDataSource):
 
         except Exception:
             return None
+
+    def get_stock_data(self, symbol: str, years: int = 5) -> tuple[FinancialData, MarketData]:
+        """
+        שליפת כל נתוני המניה - מתודה מאוחדת
+
+        קוראת לשתי המתודות הנפרדות ומחזירה את שתיהן.
+
+        Args:
+            symbol: סימול המניה
+            years: מספר שנים לשלוף
+
+        Returns:
+            tuple[FinancialData, MarketData]: נתונים פיננסיים ונתוני שוק
+        """
+        financial_data = self.get_stock_financials(symbol, years)
+        market_data = self.get_stock_market_data(symbol)
+        return financial_data, market_data

@@ -77,3 +77,24 @@ class BaseDataSource(ABC):
             Optional[float]: P/E ממוצע או None
         """
         pass
+
+    @abstractmethod
+    def get_stock_data(self, symbol: str, years: int = 5) -> tuple['FinancialData', 'MarketData']:
+        """
+        שליפת כל נתוני המניה - פיננסיים ושוק
+
+        מתודה מאוחדת המחזירה גם נתונים פיננסיים וגם נתוני שוק בקריאה אחת.
+        מקורות נתונים יכולים למטב על ידי ביצוע שתי הקריאות במקביל.
+
+        Args:
+            symbol: סימול המניה (עם סיומת בורסה, למשל AAPL.US)
+            years: מספר שנים של נתונים פיננסיים לשלוף
+
+        Returns:
+            tuple[FinancialData, MarketData]: נתונים פיננסיים ונתוני שוק
+
+        Note:
+            מתודה זו חובה לכל מקור נתונים. ניתן ליישם אותה פשוט על ידי
+            קריאה ל-get_stock_financials() ו-get_stock_market_data().
+        """
+        pass

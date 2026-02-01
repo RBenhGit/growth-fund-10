@@ -398,3 +398,20 @@ class AlphaVantageSource(BaseDataSource):
         # Alpha Vantage doesn't provide index-level P/E
         logger.warning("P/E ממוצע של המדד לא זמין ב-Alpha Vantage API")
         return None
+
+    def get_stock_data(self, symbol: str, years: int = 5) -> tuple[FinancialData, MarketData]:
+        """
+        שליפת כל נתוני המניה - מתודה מאוחדת
+
+        שימוש בהגבלת קצב (rate limiting) לשתי הקריאות.
+
+        Args:
+            symbol: סימול המניה
+            years: מספר שנים לשלוף
+
+        Returns:
+            tuple[FinancialData, MarketData]: נתונים פיננסיים ונתוני שוק
+        """
+        financial_data = self.get_stock_financials(symbol, years)
+        market_data = self.get_stock_market_data(symbol)
+        return financial_data, market_data

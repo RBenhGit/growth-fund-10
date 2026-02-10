@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-02-10T05:08:09.911013",
+  "index": "SP500",
+  "quarter": "Q1",
+  "year": 2026,
+  "total_constituents": 503,
+  "loaded": 498,
+  "failed": 3,
+  "failures": {
+    "not_found": [],
+    "api_error": [],
+    "financial_validation": [
+      {
+        "symbol": "PSKY.US",
+        "name": "Paramount Skydance Corporation Class B Common Stock",
+        "reason": "Invalid financial data (see logs for details)"
+      },
+      {
+        "symbol": "Q.US",
+        "name": "Qnity Electronics, Inc",
+        "reason": "Invalid financial data (see logs for details)"
+      },
+      {
+        "symbol": "FISV.US",
+        "name": "Fiserv, Inc. Common Stock",
+        "reason": "Invalid financial data (see logs for details)"
+      }
+    ],
+    "pricing_validation": []
+  }
+}

@@ -33,9 +33,6 @@ from config import settings
 from data_sources.router import DataSourceRouter
 from data_sources.adapter import DataSourceAdapter
 from data_sources import (
-    EODHDDataSource,
-    FMPDataSource,
-    TASEDataHubSource,
     AlphaVantageSource,
     YFinanceSource
 )
@@ -178,10 +175,6 @@ def test_router(index_name: str):
         pricing_source = router.get_pricing_source(index_name)
         console.print(f"[green]✓ נבחר מקור מחירים: {pricing_source.__class__.__name__}[/green]")
 
-        # Test legacy method (backwards compatibility)
-        legacy_source = router.get_data_source(index_name)
-        console.print(f"[green]✓ מתודה ישנה (legacy) עובדת: {legacy_source.__class__.__name__}[/green]")
-
         return True
     except Exception as e:
         console.print(f"[red]❌ שגיאה ב-Router: {e}[/red]")
@@ -202,16 +195,6 @@ def main():
 
     # Test configurations: (name, class, test_symbol, index_name)
     tests = []
-
-    if settings.EODHD_API_KEY:
-        tests.append(("EODHD (US)", EODHDDataSource, "AAPL.US", "SP500"))
-        tests.append(("EODHD (TASE)", EODHDDataSource, "LPSN.TA", "TASE125"))
-
-    if settings.FMP_API_KEY:
-        tests.append(("FMP", FMPDataSource, "AAPL", "SP500"))
-
-    if settings.TASE_DATA_HUB_API_KEY:
-        tests.append(("TASE Data Hub", TASEDataHubSource, "LPSN.TA", "TASE125"))
 
     if settings.ALPHAVANTAGE_API_KEY:
         tests.append(("Alpha Vantage", AlphaVantageSource, "AAPL", "SP500"))

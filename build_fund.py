@@ -15,6 +15,9 @@ import sys
 import os
 import logging
 from pathlib import Path
+from datetime import datetime
+import time
+import json
 
 # Fix Windows console encoding for Hebrew
 if sys.platform == "win32":
@@ -221,6 +224,115 @@ def select_stocks_skip_duplicates(ranked_stocks, count):
     return selected
 
 
+def write_data_quality_log(
+    index_name: str,
+    quarter: str,
+    year: int,
+    constituents: list,
+    validated_stocks: list,
+    data_failures: dict
+) -> str:
+    """
+    כתיבת דוח איכות נתונים לקובץ לוג
+    Write data quality report to log file
+
+    Args:
+        index_name: Index name (TASE125/SP500)
+        quarter: Quarter (Q1-Q4)
+        year: Year
+        constituents: Original list of index constituents
+        validated_stocks: List of stocks that passed validation
+        data_failures: Dictionary of data failure categories
+
+    Returns:
+        str: Path to created log file
+    """
+    # Create log filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    fund_name = format_fund_name(quarter, year, index_name)
+    log_filename = f"logs/data_quality_{index_name}_{quarter}_{year}_{timestamp}.log"
+
+    # Ensure logs directory exists
+    os.makedirs("logs", exist_ok=True)
+
+    with open(log_filename, 'w', encoding='utf-8') as f:
+        # Header
+        f.write("=" * 70 + "\n")
+        f.write(f"DATA QUALITY REPORT: {fund_name}\n")
+        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("=" * 70 + "\n\n")
+
+        # Summary
+        total_stocks = len(constituents)
+        failed_stocks = sum(len(v) for v in data_failures.values())
+        passed_stocks = len(validated_stocks)
+
+        f.write("SUMMARY\n")
+        f.write("-" * 70 + "\n")
+        f.write(f"Total stocks in index: {total_stocks}\n")
+        f.write(f"Successfully validated: {passed_stocks}\n")
+        f.write(f"Failed validation: {failed_stocks}\n\n")
+
+        # Detailed failures by category
+        f.write("VALIDATION FAILURES BY CATEGORY\n")
+        f.write("-" * 70 + "\n\n")
+
+        if data_failures.get('not_found'):
+            f.write(f"1. DATA NOT FOUND ({len(data_failures['not_found'])} stocks)\n")
+            for failure in data_failures['not_found']:
+                f.write(f"   - {failure['symbol']} ({failure['name']})\n")
+                f.write(f"     Reason: {failure['reason']}\n\n")
+
+        if data_failures.get('api_error'):
+            f.write(f"2. API ERRORS ({len(data_failures['api_error'])} stocks)\n")
+            for failure in data_failures['api_error']:
+                f.write(f"   - {failure['symbol']} ({failure['name']})\n")
+                f.write(f"     Reason: {failure['reason']}\n\n")
+
+        if data_failures.get('financial_validation'):
+            f.write(f"3. FINANCIAL DATA VALIDATION FAILED ({len(data_failures['financial_validation'])} stocks)\n")
+            for failure in data_failures['financial_validation']:
+                f.write(f"   - {failure['symbol']} ({failure['name']})\n")
+                f.write(f"     Reason: {failure['reason']}\n")
+                f.write(f"     Note: Check logs for specific validation issues\n\n")
+
+        if data_failures.get('pricing_validation'):
+            f.write(f"4. PRICING DATA VALIDATION FAILED ({len(data_failures['pricing_validation'])} stocks)\n")
+            for failure in data_failures['pricing_validation']:
+                f.write(f"   - {failure['symbol']} ({failure['name']})\n")
+                f.write(f"     Reason: {failure['reason']}\n")
+                f.write(f"     Note: Check logs for specific validation issues\n\n")
+
+        # List of excluded stocks
+        f.write("\nSTOCKS EXCLUDED FROM FUND ANALYSIS\n")
+        f.write("-" * 70 + "\n")
+        excluded_symbols = set()
+        for failures in data_failures.values():
+            for failure in failures:
+                excluded_symbols.add(failure['symbol'])
+
+        if excluded_symbols:
+            for symbol in sorted(excluded_symbols):
+                f.write(f"- {symbol}\n")
+        else:
+            f.write("(None - all stocks passed validation)\n")
+
+        # Recommendations
+        f.write("\n\nRECOMMENDATIONS\n")
+        f.write("-" * 70 + "\n")
+        if failed_stocks > 0:
+            f.write("1. Review logs for detailed validation error messages\n")
+            f.write("2. Check TwelveData API status if multiple stocks fail\n")
+            f.write("3. Stocks with 'null' prices may need manual data verification\n")
+            f.write("4. Consider upgrading TwelveData plan if rate limits are hit\n")
+        else:
+            f.write("All stocks passed validation successfully!\n")
+
+        f.write("\n" + "=" * 70 + "\n")
+
+    return log_filename
+
+
 def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
     """
     תהליך בניית הקרן - 14 שלבים
@@ -267,13 +379,22 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
     financial_source_name = financial_source.__class__.__name__
     pricing_source_name = pricing_source.__class__.__name__
 
+    # בדיקה אם שני המקורות זהים ותומכים בקריאה מאוחדת
+    use_unified_call = (
+        financial_source == pricing_source and
+        hasattr(financial_source, 'get_stock_data') and
+        callable(getattr(financial_source, 'get_stock_data', None))
+    )
+
     # הצגת הגדרות מקורות הנתונים
+    optimization_note = "\n[dim]אופטימיזציה: שימוש בקריאה מאוחדת (חוסך קריאות API)[/dim]" if use_unified_call else ""
     console.print(Panel(
         f"[bold cyan]הגדרות מקורות נתונים[/bold cyan]\n\n"
         f"מדד: [yellow]{index_name}[/yellow]\n"
         f"מקור נתונים פיננסיים: [yellow]{financial_source_name}[/yellow]\n"
         f"מקור נתוני מחירים: [yellow]{pricing_source_name}[/yellow]\n"
-        f"שימוש ב-cache: [yellow]{'מופעל' if use_cache else 'כבוי'}[/yellow]",
+        f"שימוש ב-cache: [yellow]{'מופעל' if use_cache else 'כבוי'}[/yellow]"
+        f"{optimization_note}",
         border_style="cyan"
     ))
 
@@ -338,6 +459,20 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                     json.dump(constituents, f, ensure_ascii=False, indent=2)
                 console.print(f"  [green]✓[/green] נמצאו {len(constituents)} מניות במדד")
 
+            # Display estimated processing time
+            import math
+            # Financial only: 3 calls × ~100 credits = ~300 credits/stock
+            # With Pro 1597 plan and 65% safety: 1597 * 0.65 / 300 = ~3.5 stocks/min
+            # yfinance handles pricing (free, no rate limit)
+            estimated_stocks_per_minute = 3  # With yfinance for pricing + 65% safety margin
+            minutes_needed = math.ceil(len(constituents) / estimated_stocks_per_minute)
+            console.print(
+                f"\n  ⏱️  [yellow]זמן משוער / Estimated time: {minutes_needed}-{minutes_needed + 5} דקות / minutes[/yellow]"
+            )
+            console.print(
+                f"  [dim](~{estimated_stocks_per_minute} מניות לדקה - ~300 credits/stock for financials, yfinance for pricing)[/dim]"
+            )
+
             progress.update(task1, completed=True)
         except Exception as e:
             progress.update(task1, completed=True)
@@ -350,6 +485,19 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
             base_eligible = []
             all_loaded_stocks = []
 
+            # Initialize failure tracking
+            data_failures = {
+                'not_found': [],           # Stock not found in data source
+                'api_error': [],           # API errors during fetch
+                'financial_validation': [], # Financial data failed validation
+                'pricing_validation': [],  # Pricing data failed validation
+            }
+
+            # Initialize progress tracking
+            total_credits_estimate = 0
+            stocks_processed = 0
+            start_time = time.time()
+
             for constituent in constituents:  # עובר על כל המניות במדד
                 symbol = constituent["symbol"]
                 if not symbol.endswith(suffix):
@@ -358,11 +506,62 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                 stock_cache = cache_dir / f"{symbol.replace('.', '_')}.json"
 
                 try:
-                    # טעינה מ-cache או שליפה מהשרת
-                    if use_cache and stock_cache.exists():
-                        with open(stock_cache, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                            stock = Stock(**data)
+                    # ALWAYS fetch fresh data from API (no cache loading for stock data)
+                    # אופטימיזציה: קריאה מאוחדת אם שני המקורות זהים
+                    if use_unified_call:
+                        logger.info(f"שולף נתוני {symbol} באמצעות קריאה מאוחדת מ-{financial_source_name}")
+                        try:
+                            financial_data, market_data = financial_source.get_stock_data(symbol, years=5)
+                        except DataSourceNotFoundError:
+                            # Track failure
+                            data_failures['not_found'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Stock not found in data source'
+                            })
+                            logger.warning(f"מניה {symbol} לא נמצאה ב-{financial_source_name}, מדלג")
+                            continue
+                        except DataSourceRateLimitError as e:
+                            logger.error(f"הגעת למגבלת קריאות API: {e}")
+                            console.print(
+                                f"[yellow]⚠ הגעת למגבלת קריאות API של {financial_source_name}[/yellow]\n"
+                                "[yellow]נסה שוב מאוחר יותר או פנה לתמיכה[/yellow]"
+                            )
+                            raise  # Stop processing
+                        except DataSourceError as e:
+                            # Track failure
+                            data_failures['api_error'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': f'API error: {str(e)}'
+                            })
+                            logger.error(f"שגיאה בשליפת נתונים עבור {symbol}: {e}, מדלג")
+                            continue
+
+                        # תיקוף נתונים פיננסיים (strict validation for all indices)
+                        if not adapter.validate_financial_data(financial_data, symbol, financial_source_name,
+                                                              is_index_constituent=False):
+                            # Track failure
+                            data_failures['financial_validation'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Invalid financial data (see logs for details)'
+                            })
+                            logger.error(f"נתונים פיננסיים לא תקינים עבור {symbol}, מדלג")
+                            continue
+
+                        # תיקוף נתוני שוק (strict validation for all indices)
+                        if not adapter.validate_market_data(market_data, symbol, financial_source_name,
+                                                           is_index_constituent=False):
+                            # Track failure
+                            data_failures['pricing_validation'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Invalid pricing data (see logs for details)'
+                            })
+                            logger.error(f"נתוני מחירים לא תקינים עבור {symbol}, מדלג")
+                            continue
+
                     else:
                         # שליפה ממקורות נפרדים - נתונים פיננסיים ומחירים
                         logger.info(
@@ -375,43 +574,94 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                         try:
                             financial_data = financial_source.get_stock_financials(symbol, years=5)
                         except DataSourceNotFoundError:
+                            # Track failure
+                            data_failures['not_found'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Stock not found in financial data source'
+                            })
                             logger.warning(f"מניה {symbol} לא נמצאה ב-{financial_source_name}, מדלג")
                             continue
                         except DataSourceRateLimitError as e:
                             logger.error(f"הגעת למגבלת קריאות API: {e}")
                             console.print(
                                 f"[yellow]⚠ הגעת למגבלת קריאות API של {financial_source_name}[/yellow]\n"
-                                "[yellow]שקול להשתמש בנתונים שנשמרו ב-cache או להמתין[/yellow]"
+                                "[yellow]נסה שוב מאוחר יותר או פנה לתמיכה[/yellow]"
                             )
-                            raise
+                            raise  # Stop processing
+                        except DataSourceError as e:
+                            # Track failure
+                            data_failures['api_error'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': f'Financial API error: {str(e)}'
+                            })
+                            logger.error(f"שגיאה בשליפת נתונים פיננסיים עבור {symbol}: {e}, מדלג")
+                            continue
 
-                        # תיקוף נתונים פיננסיים
-                        if not adapter.validate_financial_data(financial_data, symbol, financial_source_name):
+                        # תיקוף נתונים פיננסיים (strict validation for all indices)
+                        if not adapter.validate_financial_data(financial_data, symbol, financial_source_name,
+                                                              is_index_constituent=False):
+                            # Track failure
+                            data_failures['financial_validation'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Invalid financial data (see logs for details)'
+                            })
                             logger.error(f"נתונים פיננסיים לא תקינים עבור {symbol}, מדלג")
                             continue
 
                         # שליפת נתוני מחירים
+                        # Normalize symbol for pricing source (e.g., strip .US for yfinance)
+                        _source_name_map = {'YFinanceSource': 'yfinance', 'TwelveDataSource': 'twelvedata', 'AlphaVantageSource': 'alphavantage'}
+                        pricing_symbol = adapter.normalize_symbol(symbol, index_name, _source_name_map.get(pricing_source_name, 'yfinance'))
+
+                        # Get fiscal dates from financial source for discrete price fetching
+                        fiscal_dates = None
+                        if hasattr(financial_source, '_last_fiscal_dates'):
+                            fiscal_dates = financial_source._last_fiscal_dates.get(symbol)
+
                         try:
-                            market_data = pricing_source.get_stock_market_data(symbol)
+                            market_data = pricing_source.get_stock_market_data(pricing_symbol, fiscal_dates=fiscal_dates)
                         except DataSourceNotFoundError:
+                            # Track failure
+                            data_failures['not_found'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Pricing data not found'
+                            })
                             logger.warning(f"נתוני מחירים עבור {symbol} לא נמצאו ב-{pricing_source_name}, מדלג")
                             continue
                         except DataSourceError as e:
-                            logger.warning(f"שגיאה בשליפת נתוני מחירים עבור {symbol}: {e}")
-                            # ממשיך בלי נתוני מחירים - ייתכן שהמניה תיפסל
+                            # Track failure
+                            data_failures['api_error'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': f'Pricing API error: {str(e)}'
+                            })
+                            logger.error(f"שגיאה בשליפת נתוני מחירים עבור {symbol}: {e}, מדלג")
+                            continue
 
-                        # תיקוף נתוני שוק
-                        if not adapter.validate_market_data(market_data, symbol, pricing_source_name):
-                            logger.warning(f"נתוני מחירים חלקיים עבור {symbol} - ציון momentum/valuation עלול להיות לא מדויק")
+                        # תיקוף נתוני שוק (strict validation for all indices)
+                        if not adapter.validate_market_data(market_data, symbol, pricing_source_name,
+                                                           is_index_constituent=False):
+                            # Track failure
+                            data_failures['pricing_validation'].append({
+                                'symbol': symbol,
+                                'name': constituent['name'],
+                                'reason': 'Invalid pricing data (see logs for details)'
+                            })
+                            logger.error(f"נתוני מחירים לא תקינים עבור {symbol}, מדלג")
+                            continue
 
-                        # יצירת אובייקט המניה
-                        stock = Stock(
-                            symbol=symbol,
-                            name=constituent["name"],
-                            index=index_name,
-                            financial_data=financial_data,
-                            market_data=market_data
-                        )
+                    # יצירת אובייקט המניה
+                    stock = Stock(
+                        symbol=symbol,
+                        name=constituent["name"],
+                        index=index_name,
+                        financial_data=financial_data,
+                        market_data=market_data
+                    )
 
                     all_loaded_stocks.append(stock)
 
@@ -425,6 +675,21 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
                     # שמירה/עדכון cache
                     save_stock_to_cache(stock, cache_dir)
 
+                    # Update progress tracking
+                    stocks_processed += 1
+                    credits_per_stock = 300  # ~100 credits/call × 3 financial calls (pricing via yfinance = free)
+                    total_credits_estimate += credits_per_stock
+                    elapsed_time = time.time() - start_time
+
+                    # Display progress every stock
+                    if settings.DEBUG_MODE or stocks_processed % 5 == 0 or stocks_processed <= 10:
+                        console.print(
+                            f"  [green]✓[/green] {symbol} | "
+                            f"מניה {stocks_processed}/{len(constituents)} | "
+                            f"זיכויים משוערים: ~{total_credits_estimate} | "
+                            f"זמן: {elapsed_time:.0f}s"
+                        )
+
                 except Exception as e:
                     if settings.DEBUG_MODE:
                         console.print(f"  [yellow]⚠[/yellow] שגיאה בטעינת {symbol}: {e}")
@@ -432,8 +697,88 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
 
             builder.all_stocks = all_loaded_stocks
             builder.base_candidates = base_eligible
-            console.print(f"  [green]✓[/green] נמצאו {len(base_eligible)} מניות כשירות לקרן בסיס")
+
+            # Report data acquisition statistics
+            total_constituents = len(constituents)
+            total_loaded = len(all_loaded_stocks)
+            total_failed = sum(len(failures) for failures in data_failures.values())
+
+            # Credit Usage Summary
+            total_elapsed_minutes = (time.time() - start_time) / 60
+            effective_rate = stocks_processed / total_elapsed_minutes if total_elapsed_minutes > 0 else 0
+            avg_credits = total_credits_estimate / stocks_processed if stocks_processed > 0 else 0
+
+            console.print(f"\n[bold green]💳 סיכום שימוש בזיכויים / Credit Usage Summary[/bold green]")
+            console.print(f"  מניות שעובדו / Stocks processed: {stocks_processed}")
+            console.print(f"  ממוצע זיכויים למניה / Avg credits/stock: {avg_credits:.1f}")
+            console.print(f"  סה\"כ זיכויים משוערים / Total credits (est): ~{total_credits_estimate}")
+            console.print(f"  זמן כולל / Total time: {total_elapsed_minutes:.1f} minutes")
+            console.print(f"  קצב עיבוד / Effective rate: {effective_rate:.1f} stocks/minute")
+
+            console.print(f"\n[bold cyan]📊 סטטיסטיקת רכישת נתונים / Data Acquisition Statistics[/bold cyan]")
+            console.print(f"  סה\"כ מניות במדד / Total constituents: {total_constituents}")
+            console.print(f"  נטענו בהצלחה / Successfully loaded: {total_loaded} ({total_loaded/total_constituents*100:.1f}%)")
+            console.print(f"  נכשלו / Failed: {total_failed} ({total_failed/total_constituents*100:.1f}%)")
+
+            if total_failed > 0:
+                console.print("\n[yellow]📋 פירוט כשלונות / Failure Breakdown:[/yellow]")
+
+                if data_failures['not_found']:
+                    console.print(f"\n  [yellow]לא נמצאו במקור הנתונים / Not found ({len(data_failures['not_found'])}):[/yellow]")
+                    for failure in data_failures['not_found']:
+                        console.print(f"    • {failure['symbol']} - {failure['name']}")
+
+                if data_failures['api_error']:
+                    console.print(f"\n  [yellow]שגיאות API / API errors ({len(data_failures['api_error'])}):[/yellow]")
+                    for failure in data_failures['api_error']:
+                        console.print(f"    • {failure['symbol']} - {failure['name']}")
+                        console.print(f"      {failure['reason']}")
+
+                if data_failures['financial_validation']:
+                    console.print(f"\n  [red]נתונים פיננסיים לא תקינים / Invalid financial data ({len(data_failures['financial_validation'])}):[/red]")
+                    for failure in data_failures['financial_validation']:
+                        console.print(f"    • {failure['symbol']} - {failure['name']}")
+
+                if data_failures['pricing_validation']:
+                    console.print(f"\n  [red]נתוני מחירים לא תקינים / Invalid pricing data ({len(data_failures['pricing_validation'])}):[/red]")
+                    for failure in data_failures['pricing_validation']:
+                        console.print(f"    • {failure['symbol']} - {failure['name']}")
+
+                # Log failures to file for analysis
+                failure_log = {
+                    'timestamp': datetime.now().isoformat(),
+                    'index': index_name,
+                    'quarter': quarter,
+                    'year': year,
+                    'total_constituents': total_constituents,
+                    'loaded': total_loaded,
+                    'failed': total_failed,
+                    'failures': data_failures
+                }
+
+                log_dir = Path('logs')
+                log_dir.mkdir(exist_ok=True)
+                log_file = log_dir / f'data_failures_{index_name}_Q{quarter}_{year}.json'
+
+                with open(log_file, 'w', encoding='utf-8') as f:
+                    json.dump(failure_log, f, indent=2, ensure_ascii=False)
+
+                logger.info(f"Failure log saved to {log_file}")
+
+            console.print(f"\n  [green]✓[/green] נמצאו {len(base_eligible)} מניות כשירות לקרן בסיס")
             progress.update(task2, completed=True)
+
+            # Generate data quality log
+            log_file = write_data_quality_log(
+                index_name=index_name,
+                quarter=quarter,
+                year=year,
+                constituents=constituents,
+                validated_stocks=all_loaded_stocks,
+                data_failures=data_failures
+            )
+            console.print(f"  [cyan]📋 Data quality log: {log_file}[/cyan]")
+
         except Exception as e:
             progress.update(task2, completed=True)
             raise RuntimeError(f"שלב 2 נכשל: {e}")
@@ -496,7 +841,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         # ===== שלב 7: חישוב ציון פוטנציאל =====
         task7 = progress.add_task("[cyan]שלב 7: חישוב ציון פוטנציאל...", total=None)
         try:
-            index_pe = data_source.get_index_pe_ratio(index_name)
+            index_pe = financial_source.get_index_pe_ratio(index_name)
             ranked_potential = builder.score_and_rank_potential_stocks(builder.potential_candidates, index_pe)
 
             # עדכון cache עם ציונים

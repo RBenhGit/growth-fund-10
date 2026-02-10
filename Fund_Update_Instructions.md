@@ -27,8 +27,8 @@
 - **מחירי מניות:** אתר הבורסה - מחירים בזמן אמת או סוף יום
 
 #### מקורות גיבוי (רק אם חסרים נתונים):
-- **נתונים פיננסיים:** Investing.com, Yahoo Finance
-- **מחירי מניות:** Google Finance, Investing.com
+- **נתונים פיננסיים:** Yahoo Finance
+- **מחירי מניות:** Google Finance
 - **נתונים משלימים:** אתרי מידע פיננסי מקומיים
 
 **תאריך ייחוס:** השתמש בנתוני הדיווח הרבעוני האחרון שפורסם במגנא
@@ -42,7 +42,7 @@
 - **מחירי מניות:** אתרי הבורסות הרשמיים (NYSE, NASDAQ)
 
 #### מקורות גיבוי (רק אם חסרים נתונים):
-- **נתונים פיננסיים:** Yahoo Finance, Google Finance, Investing.com
+- **נתונים פיננסיים:** Yahoo Finance, Google Finance
 - **מחירי מניות:** Yahoo Finance, Google Finance
 - **נתונים משלימים:** Bloomberg (אם זמין), MarketWatch, Seeking Alpha
 

@@ -17,7 +17,7 @@ An automated system for building and managing investment portfolios based on sto
 ## ✨ Features
 
 - **Dual-Market Support**: Works with both Israeli (TA-125) and US (S&P500) stocks
-- **Hybrid Data Sources**: Uses EODHD API for financial data and yfinance for pricing
+- **Hybrid Data Sources**: Uses TwelveData API for financial data and yfinance for pricing
 - **Automated Scoring**: Multi-factor scoring system for stock selection
 - **Smart Caching**: Reduces API calls and improves performance
 - **Beautiful CLI**: Rich terminal UI with progress bars and tables
@@ -66,20 +66,20 @@ Copy the example `.env` file and configure it:
 
 ```bash
 # Data Sources
-FINANCIAL_DATA_SOURCE=eodhd     # Financial statements source
-PRICING_DATA_SOURCE=yfinance     # Price history source
+FINANCIAL_DATA_SOURCE=twelvedata  # Financial statements source
+PRICING_DATA_SOURCE=yfinance      # Price history source
 
 # API Keys
-EODHD_API_KEY=your-api-key-here  # Get from https://eodhd.com/
+TWELVEDATA_API_KEY=your-api-key-here  # Get from https://twelvedata.com/
 
 # Optional Settings
 USE_CACHE=true
 DEBUG_MODE=false
 ```
 
-**Get your EODHD API Key:**
-1. Visit https://eodhd.com/
-2. Sign up for a free or paid plan
+**Get your TwelveData API Key:**
+1. Visit https://twelvedata.com/
+2. Sign up for a Pro plan (610+ credits/min recommended)
 3. Copy your API key to `.env`
 
 ## ⚙️ Configuration
@@ -89,21 +89,19 @@ DEBUG_MODE=false
 The system uses **separate data sources** for different data types:
 
 **Financial Data (FINANCIAL_DATA_SOURCE):**
-- `eodhd` - EOD Historical Data API (**recommended**)
-- `fmp` - Financial Modeling Prep API
-- `alphavantage` - Alpha Vantage API
-- `investing` - Investing.com (via Selenium)
+- `twelvedata` - TwelveData API (**recommended**)
+- `alphavantage` - Alpha Vantage API (US only)
 
 **Pricing Data (PRICING_DATA_SOURCE):**
 - `yfinance` - Yahoo Finance (**recommended** - free, no API key needed)
-- `eodhd` - EOD Historical Data API
+- `twelvedata` - TwelveData API
 - `alphavantage` - Alpha Vantage API
 
 ### Recommended Configuration
 
 ```bash
-FINANCIAL_DATA_SOURCE=eodhd      # Best for fundamentals
-PRICING_DATA_SOURCE=yfinance     # Free, reliable pricing
+FINANCIAL_DATA_SOURCE=twelvedata  # Best for fundamentals
+PRICING_DATA_SOURCE=yfinance      # Free, reliable pricing
 ```
 
 ## 🎯 Running the App
@@ -238,48 +236,19 @@ The backtest generates:
 
 Before running a full fund build, verify your data sources are working:
 
-### Test EODHD API
+### Test All Data Sources
 
 ```bash
-python test_eodhd.py
+python tests/test_all_sources.py
 ```
 
 Tests:
 - API connection and authentication
-- Fundamentals data (Apple example)
-- Income statements
-- Israeli stocks (TASE)
-- S&P 500 constituents list
-
-### Test yfinance
-
-```bash
-python test_price_history.py
-```
-
-Tests:
-- Price history retrieval
+- Financial data retrieval (fundamentals)
+- Pricing data retrieval (market prices)
 - US stocks (AAPL, MSFT, GOOGL)
 - Israeli stocks (TEVA.TA, NICE.TA)
-
-### Test Full Integration (QA)
-
-```bash
-python test_data_sources_qa.py
-```
-
-Runs comprehensive QA testing:
-- EODHD financial data for 3 US stocks
-- yfinance pricing data for 3 US stocks
-- EODHD financial data for 2 Israeli stocks
-- yfinance pricing data for 2 Israeli stocks
-- Validates both data sources work together
-
-**Expected output:**
-```
-✓ בדיקת QA עברה בהצלחה!
-  האינטגרציה בין EODHD ל-yfinance עובדת כראוי
-```
+- Router source selection
 
 ## 📁 Project Structure
 
@@ -295,9 +264,9 @@ Runs comprehensive QA testing:
 │   └── financial_data.py      # Financial metrics models
 ├── data_sources/
 │   ├── base_data_source.py    # Abstract data source interface
-│   ├── eodhd_api.py           # EODHD API implementation
-│   ├── fmp_api.py             # FMP API implementation
-│   └── investing_scraper.py   # Investing.com scraper
+│   ├── twelvedata_api.py      # TwelveData API (recommended)
+│   ├── yfinance_source.py     # Yahoo Finance (free pricing)
+│   └── alphavantage_api.py    # Alpha Vantage API (US only)
 ├── fund_builder/
 │   └── fund_builder.py        # Fund construction logic
 ├── utils/
@@ -316,12 +285,12 @@ Runs comprehensive QA testing:
 
 ### Common Issues
 
-**Problem: "EODHD_API_KEY must be set in .env"**
+**Problem: "TWELVEDATA_API_KEY must be set in .env"**
 
 Solution:
 ```bash
 # Add your API key to .env file
-EODHD_API_KEY=your-actual-api-key-here
+TWELVEDATA_API_KEY=your-actual-api-key-here
 ```
 
 **Problem: "No module named 'yfinance'"**
@@ -346,7 +315,7 @@ Solution:
 # Use cache to reduce API calls
 python build_fund.py --index SP500  # Cache enabled by default
 
-# Or wait and retry (EODHD limits: varies by plan)
+# Or wait and retry (TwelveData limits: varies by plan)
 ```
 
 **Problem: "No data found for symbol"**
@@ -398,9 +367,8 @@ python build_fund.py --index SP500 --no-cache
 
 ### API Documentation
 
-- **EODHD API**: https://eodhd.com/financial-apis/
+- **TwelveData**: https://twelvedata.com/
 - **yfinance**: https://github.com/ranaroussi/yfinance
-- **FMP API**: https://financialmodelingprep.com/developer/docs/
 - **Alpha Vantage**: https://www.alphavantage.co/documentation/
 
 ### Market Data Sources
@@ -417,10 +385,10 @@ python build_fund.py --index SP500 --no-cache
 pip install -r requirements.txt
 
 # 2. Configure .env
-# Add your EODHD_API_KEY
+# Add your TWELVEDATA_API_KEY
 
 # 3. Test data sources
-python test_data_sources_qa.py
+python tests/test_all_sources.py
 
 # 4. Build your first fund
 python build_fund.py --index SP500

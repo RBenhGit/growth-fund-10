@@ -8,24 +8,24 @@ if sys.platform == "win32":
     import codecs
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
-from data_sources.eodhd_api import EODHDDataSource
+from data_sources.twelvedata_api import TwelveDataSource
 from config import settings
 import json
 
 def main():
     print("🔍 בודק רכיבי מדד S&P 500...")
-    print(f"📡 מקור נתונים: EODHD API")
+    print(f"📡 מקור נתונים: TwelveData API")
     print()
 
     # יצירת מקור נתונים
-    data_source = EODHDDataSource()
+    data_source = TwelveDataSource()
 
     # בדיקת חיבור
     if not data_source.login():
-        print("❌ שגיאה בחיבור ל-EODHD API")
+        print("❌ שגיאה בחיבור ל-TwelveData API")
         return
 
-    print("✅ חיבור תקין ל-EODHD API")
+    print("✅ חיבור תקין ל-TwelveData API")
     print()
 
     # שליפת רכיבי המדד

@@ -4,11 +4,8 @@ Data Source Router - Advanced Version with Dual-Source Support
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Optional
 from .base_data_source import BaseDataSource
-from .eodhd_api import EODHDDataSource
-from .fmp_api import FMPDataSource
-from .tase_data_hub_api import TASEDataHubSource
 from .alphavantage_api import AlphaVantageSource
 from .twelvedata_api import TwelveDataSource
 from .yfinance_source import YFinanceSource
@@ -29,6 +26,13 @@ class DataSourceRouter:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        # Cache created instances so the same source object is reused.
+        # This is critical for TwelveDataSource: when both financial and pricing
+        # sources are "twelvedata", reusing the same instance ensures:
+        # 1. financial_source == pricing_source → True → unified call path is used
+        # 2. Credit tracking is shared (single _credits_used_this_minute counter)
+        # 3. Rate limiting works correctly across both data types
+        self._instance_cache: Dict[str, BaseDataSource] = {}
 
     def get_financial_source(self, index_name: str) -> BaseDataSource:
         """
@@ -45,15 +49,15 @@ class DataSourceRouter:
         Logic:
             1. אם מקור מוגדר במפורש (US_FINANCIAL_DATA_SOURCE/TASE_FINANCIAL_DATA_SOURCE) → השתמש בו
             2. אחרת, בחירה אוטומטית מרשימת מקורות מומלצים:
-               - SP500: FMP → Alpha Vantage → EODHD
-               - TASE125: TASE Data Hub → EODHD
+               - SP500: TwelveData → Alpha Vantage
+               - TASE125: TwelveData
         """
         if index_name == "SP500":
             source_name = settings.US_FINANCIAL_DATA_SOURCE
-            default_chain = ["fmp", "alphavantage", "eodhd"]
+            default_chain = ["twelvedata", "alphavantage"]
         elif index_name == "TASE125":
             source_name = settings.TASE_FINANCIAL_DATA_SOURCE
-            default_chain = ["tase_data_hub", "eodhd"]
+            default_chain = ["twelvedata"]
         else:
             raise ValueError(f"Unsupported index: {index_name}")
 
@@ -90,15 +94,15 @@ class DataSourceRouter:
         Logic:
             1. אם מקור מוגדר במפורש (US_PRICING_DATA_SOURCE/TASE_PRICING_DATA_SOURCE) → השתמש בו
             2. אחרת, בחירה אוטומטית מרשימת מקורות מומלצים:
-               - SP500: yfinance (חינמי!) → EODHD → Alpha Vantage
-               - TASE125: yfinance (חינמי!) → EODHD
+               - SP500: yfinance (חינמי!) → TwelveData → Alpha Vantage
+               - TASE125: yfinance (חינמי!) → TwelveData
         """
         if index_name == "SP500":
             source_name = settings.US_PRICING_DATA_SOURCE
-            default_chain = ["yfinance", "eodhd", "alphavantage"]
+            default_chain = ["yfinance", "twelvedata", "alphavantage"]
         elif index_name == "TASE125":
             source_name = settings.TASE_PRICING_DATA_SOURCE
-            default_chain = ["yfinance", "eodhd"]
+            default_chain = ["yfinance", "twelvedata"]
         else:
             raise ValueError(f"Unsupported index: {index_name}")
 
@@ -128,26 +132,6 @@ class DataSourceRouter:
             f"אין מקור נתוני מחירים זמין עבור {index_name}"
         )
 
-    def get_data_source(self, index_name: str) -> BaseDataSource:
-        """
-        Legacy method - returns financial data source.
-        Use get_financial_source() and get_pricing_source() instead.
-
-        מתודה מיושנת - מחזירה מקור נתונים פיננסיים.
-        עדיף להשתמש ב-get_financial_source() ו-get_pricing_source().
-
-        Args:
-            index_name: שם המדד
-
-        Returns:
-            BaseDataSource: מקור נתונים פיננסיים
-        """
-        self.logger.warning(
-            "get_data_source() is deprecated. "
-            "Use get_financial_source() and get_pricing_source() instead."
-        )
-        return self.get_financial_source(index_name)
-
     def _validate_source_availability(self, source_name: str) -> bool:
         """
         Check if a data source has required API keys configured
@@ -161,11 +145,8 @@ class DataSourceRouter:
             bool: True אם המקור זמין לשימוש
         """
         api_key_map = {
-            "eodhd": settings.EODHD_API_KEY,
-            "fmp": settings.FMP_API_KEY,
-            "tase_data_hub": settings.TASE_DATA_HUB_API_KEY,
             "alphavantage": settings.ALPHAVANTAGE_API_KEY,
-            "investing": settings.INVESTING_EMAIL and settings.INVESTING_PASSWORD,
+
             "twelvedata": settings.TWELVEDATA_API_KEY,
             "yfinance": True  # No API key needed
         }
@@ -173,12 +154,14 @@ class DataSourceRouter:
 
     def _create_source(self, source_name: str) -> BaseDataSource:
         """
-        Factory method to create data source instance
+        Factory method to create (or reuse) data source instance
 
-        יצירת instance של מקור נתונים
+        Returns cached instance if one already exists for this source_name.
+        This is critical for TwelveDataSource so that financial and pricing
+        calls share the same credit counter and rate limiter.
 
         Args:
-            source_name: שם המקור (eodhd, fmp, tase_data_hub, alphavantage, investing)
+            source_name: שם המקור (alphavantage, twelvedata, yfinance)
 
         Returns:
             BaseDataSource: instance מוכן לשימוש
@@ -186,10 +169,12 @@ class DataSourceRouter:
         Raises:
             ValueError: אם שם המקור לא מוכר
         """
+        # Return cached instance if available
+        if source_name in self._instance_cache:
+            self.logger.debug(f"Reusing cached {source_name} instance")
+            return self._instance_cache[source_name]
+
         source_map = {
-            "eodhd": EODHDDataSource,
-            "fmp": FMPDataSource,
-            "tase_data_hub": TASEDataHubSource,
             "alphavantage": AlphaVantageSource,
             "twelvedata": TwelveDataSource,
             "yfinance": YFinanceSource
@@ -199,41 +184,18 @@ class DataSourceRouter:
         if not source_class:
             raise ValueError(f"Unknown data source: {source_name} / מקור נתונים לא מוכר")
 
-        return source_class()
+        instance = source_class()
+        self._instance_cache[source_name] = instance
+        return instance
 
     def _create_yfinance_source(self) -> BaseDataSource:
         """
-        Create a yfinance wrapper source
+        Create (or reuse) a yfinance wrapper source
 
         יצירת instance של yfinance
 
         Returns:
             YFinanceSource: מקור נתונים חינמי למחירים
         """
-        return YFinanceSource()
+        return self._create_source("yfinance")
 
-    # ====================================================================
-    # Legacy methods for backwards compatibility
-    # מתודות ישנות לתמיכה לאחור
-    # ====================================================================
-
-    def _route_tase125(self) -> BaseDataSource:
-        """
-        Legacy: ניתוב למקור נתונים עבור TASE125
-        Use get_financial_source("TASE125") instead
-        """
-        return self.get_financial_source("TASE125")
-
-    def _route_sp500(self) -> BaseDataSource:
-        """
-        Legacy: ניתוב למקור נתונים עבור SP500
-        Use get_financial_source("SP500") instead
-        """
-        return self.get_financial_source("SP500")
-
-    def _get_explicit_source(self, source_name: str) -> BaseDataSource:
-        """
-        Legacy: קבלת מקור נתונים לפי שם
-        Use _create_source() instead
-        """
-        return self._create_source(source_name)

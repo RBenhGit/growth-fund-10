@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-02-10T22:03:44.860442",
+  "index": "TASE125",
+  "quarter": "Q1",
+  "year": 2026,
+  "total_constituents": 117,
+  "loaded": 108,
+  "failed": 2,
+  "failures": {
+    "not_found": [],
+    "api_error": [],
+    "financial_validation": [],
+    "pricing_validation": [
+      {
+        "symbol": "ENLT.TA",
+        "name": "Enlight Renewable Energy Ltd",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "ACRO.TA",
+        "name": "Kvutzat Acro Ltd.",
+        "reason": "Invalid pricing data (see logs for details)"
+      }
+    ]
+  }
+}

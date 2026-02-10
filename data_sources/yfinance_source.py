@@ -24,7 +24,7 @@ class YFinanceSource(BaseDataSource):
 
     חסרונות:
     - לא מספק נתונים פיננסיים היסטוריים מפורטים
-    - לא מתאים לבניית קרן (השתמש ב-FMP, EODHD, או TASE Data Hub למידע פיננסי)
+    - לא מתאים לבניית קרן (השתמש ב-TwelveData או Alpha Vantage למידע פיננסי)
     """
 
     def __init__(self):
@@ -61,7 +61,7 @@ class YFinanceSource(BaseDataSource):
         """
         raise NotImplementedError(
             f"yfinance doesn't provide index constituents for {index_name}. "
-            "Please use eodhd, fmp, or tase_data_hub for constituent lists."
+            "Please use twelvedata or alphavantage for constituent lists."
         )
 
     def get_stock_financials(self, symbol: str, years: int = 5) -> FinancialData:
@@ -69,7 +69,7 @@ class YFinanceSource(BaseDataSource):
         שליפת נתונים פיננסיים - מוגבל!
 
         yfinance מספק נתונים פיננסיים בסיסיים אבל לא מפורטים מספיק לבניית קרן.
-        השתמש ב-FMP, EODHD, או TASE Data Hub למידע פיננסי מקיף.
+        השתמש ב-TwelveData או Alpha Vantage למידע פיננסי מקיף.
 
         Args:
             symbol: סימול המניה
@@ -80,7 +80,7 @@ class YFinanceSource(BaseDataSource):
         """
         logger.warning(
             f"yfinance provides limited financial data for {symbol}. "
-            "Consider using fmp, eodhd, or tase_data_hub for comprehensive fundamentals."
+            "Consider using twelvedata or alphavantage for comprehensive fundamentals."
         )
 
         try:
@@ -117,44 +117,51 @@ class YFinanceSource(BaseDataSource):
                 pe_ratio=None
             )
 
-    def get_stock_market_data(self, symbol: str) -> MarketData:
+    def get_stock_market_data(self, symbol: str, fiscal_dates: Optional[List[str]] = None) -> MarketData:
         """
-        שליפת נתוני שוק - כאן yfinance מצטיין!
+        שליפת נתוני שוק - מחירי סגירה לתאריכי fiscal בלבד
 
-        זה השימוש המומלץ ב-yfinance - מחירים היסטוריים ונתוני שוק.
+        שולף מחיר נוכחי + מחיר סגירה לכל תאריך fiscal year-end.
+        התוצאה: ~6 נקודות מחיר בדידות (לא היסטוריה רציפה).
 
         Args:
             symbol: סימול המניה
+            fiscal_dates: רשימת תאריכי סוף שנת כספים (e.g., ['2025-11-30', '2024-12-31'])
+                         כאשר לא מסופק, נופל חזרה לשליפה גנרית
 
         Returns:
-            MarketData: נתוני שוק עם היסטוריית מחירים
+            MarketData: נתוני שוק עם מחירי סגירה לתאריכי fiscal + מחיר נוכחי
         """
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
-            # Get 1 year of historical prices (252 trading days)
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=365)
-            hist = ticker.history(start=start_date, end=end_date)
+            current_price = float(info.get("currentPrice") or info.get("regularMarketPrice", 0)) if (info.get("currentPrice") or info.get("regularMarketPrice")) else 0
+            market_cap = float(info.get("marketCap", 0)) if info.get("marketCap") else 0
+            pe_ratio = float(info.get("trailingPE")) if info.get("trailingPE") else None
+            stock_name = info.get("longName", symbol)
 
-            # Convert to dict
-            price_history = {
-                date.date(): float(row['Close'])
-                for date, row in hist.iterrows()
-            }
+            price_history = {}
+
+            # Fetch close price for each fiscal date
+            if fiscal_dates:
+                for fiscal_date in fiscal_dates:
+                    price = self._get_price_for_date(ticker, fiscal_date)
+                    if price is not None:
+                        price_history[fiscal_date] = price
+                    else:
+                        logger.warning(f"Could not fetch price for {symbol} near {fiscal_date}")
 
             return MarketData(
                 symbol=symbol,
-                name=info.get("longName", symbol),
-                market_cap=float(info.get("marketCap", 0)) if info.get("marketCap") else 0,
-                current_price=float(info.get("currentPrice") or info.get("regularMarketPrice", 0)) if (info.get("currentPrice") or info.get("regularMarketPrice")) else 0,
-                pe_ratio=float(info.get("trailingPE")) if info.get("trailingPE") else None,
+                name=stock_name,
+                market_cap=market_cap,
+                current_price=current_price,
+                pe_ratio=pe_ratio,
                 price_history=price_history
             )
         except Exception as e:
             logger.error(f"Error fetching market data for {symbol} from yfinance: {e}")
-            # Return minimal MarketData
             return MarketData(
                 symbol=symbol,
                 name=symbol,
@@ -164,13 +171,60 @@ class YFinanceSource(BaseDataSource):
                 price_history={}
             )
 
+    def _get_price_for_date(self, ticker, target_date_str: str) -> Optional[float]:
+        """
+        שליפת מחיר סגירה לתאריך ספציפי, עם fallback לימי עסקים קרובים
+
+        אם התאריך נופל על סוף שבוע/חג, מנסה עד 4 ימים אחורה.
+
+        Args:
+            ticker: אובייקט yfinance Ticker
+            target_date_str: תאריך יעד בפורמט YYYY-MM-DD
+
+        Returns:
+            Optional[float]: מחיר סגירה, או None אם לא נמצא
+        """
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+
+            # Fetch a 7-day window ending after the target date to handle weekends/holidays
+            start = target_date - timedelta(days=5)
+            end = target_date + timedelta(days=2)
+            hist = ticker.history(start=start, end=end)
+
+            if hist.empty:
+                logger.debug(f"No price data for {ticker.ticker} in window around {target_date_str}")
+                return None
+
+            # Find the closest trading day on or before the target date
+            for day_offset in range(0, 5):
+                check_date = target_date - timedelta(days=day_offset)
+                check_str = check_date.strftime("%Y-%m-%d")
+                for idx_date, row in hist.iterrows():
+                    if str(idx_date.date()) == check_str:
+                        price = float(row['Close'])
+                        if day_offset > 0:
+                            logger.debug(f"Price for {ticker.ticker} on {check_str} (fallback from {target_date_str}): {price}")
+                        return price
+
+            # If no exact match found, take the last available price before target
+            hist_before_target = hist[hist.index.date <= target_date.date()]
+            if not hist_before_target.empty:
+                last_row = hist_before_target.iloc[-1]
+                return float(last_row['Close'])
+
+            return None
+        except Exception as e:
+            logger.debug(f"Error fetching price for {ticker.ticker} on {target_date_str}: {e}")
+            return None
+
     def get_stock_data(self, symbol: str, years: int = 5) -> tuple[FinancialData, MarketData]:
         """
         שליפת כל נתוני המניה - מתודה מאוחדת
 
         אזהרה: yfinance מתאים רק לנתוני מחירים!
         שקול להשתמש במקורות נפרדים:
-        - מקור פיננסי: FMP/EODHD/TASE Data Hub
+        - מקור פיננסי: TwelveData/Alpha Vantage
         - מקור מחירים: yfinance (חינמי!)
 
         Args:

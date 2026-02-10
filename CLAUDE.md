@@ -29,14 +29,8 @@ python build_fund.py --index TASE125 --debug
 
 ### Testing Data Sources
 ```bash
-# Test EOD Historical Data API (requires EODHD_API_KEY in .env)
-python test_eodhd.py
-
-# Test Financial Modeling Prep API (requires FMP_API_KEY in .env)
-python test_fmp.py
-
-# Test Investing.com scraper (requires credentials in .env)
-python test_investing.py
+# Run comprehensive data source tests
+python tests/test_all_sources.py
 ```
 
 ### Installing Dependencies
@@ -64,10 +58,8 @@ pip install -r requirements.txt
 
 **Data Sources (Abstract + Implementations):**
 - [data_sources/base_data_source.py](data_sources/base_data_source.py) - Abstract base class defining the data source interface
-- [data_sources/investing_scraper.py](data_sources/investing_scraper.py) - Selenium-based web scraper for Investing.com
-  - Uses webdriver_manager for Chrome automation
-  - Implements login, constituent fetching, and financial data scraping
-  - Future: Alpha Vantage and FMP API implementations
+- [data_sources/twelvedata_api.py](data_sources/twelvedata_api.py) - TwelveData API (recommended primary source)
+- [data_sources/yfinance_source.py](data_sources/yfinance_source.py) - Yahoo Finance wrapper (free, recommended for pricing)
 
 **Utilities:**
 - [utils/date_utils.py](utils/date_utils.py) - Quarter/year calculations, fund naming conventions
@@ -77,7 +69,6 @@ pip install -r requirements.txt
 ### Directory Structure
 ```
 ├── build_fund.py           # Main entry point
-├── test_investing.py       # Scraper testing utility
 ├── config/                 # Configuration management
 │   └── settings.py
 ├── models/                 # Pydantic data models
@@ -85,11 +76,17 @@ pip install -r requirements.txt
 │   ├── fund.py            # Fund composition model
 │   └── financial_data.py  # Financial metrics models
 ├── data_sources/          # Data fetching implementations
-│   ├── base_data_source.py
-│   └── investing_scraper.py
+│   ├── base_data_source.py    # Abstract interface
+│   ├── router.py              # Data source routing system
+│   ├── adapter.py             # Validation & normalization
+│   ├── twelvedata_api.py      # TwelveData (recommended)
+│   ├── yfinance_source.py     # Yahoo Finance (free pricing)
+│   └── alphavantage_api.py    # Alpha Vantage (US only)
+├── tests/                 # Test suite
+│   └── test_all_sources.py
 ├── utils/                 # Helper utilities
 │   └── date_utils.py
-├── fund_builder/          # Fund construction logic (in development)
+├── fund_builder/          # Fund construction logic
 ├── cache/                 # Cached data (stocks, index constituents)
 └── Fund_Docs/             # Generated fund documentation
 ```
@@ -136,6 +133,19 @@ POTENTIAL_SCORE_WEIGHTS = {
 }
 ```
 
+## Algorithm Consistency
+
+The fund building algorithm treats **SP500 and TASE125 stocks identically**:
+
+- **Same eligibility criteria**: 5 years profitability for base, 2 years for potential
+- **Same scoring weights**: 40% net income, 35% revenue, 25% market cap
+- **Same fund weights**: [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
+- **Same validation rules**: Strict validation for all stocks (require valid prices, 5+ price history points)
+
+**Intentional differences** (necessary for API compatibility):
+- Symbol suffixes: `.US` for SP500, `.TA` for TASE125
+- Data source chains: Different APIs for different markets
+
 ## Data Sources
 
 The system uses a **2x2 configuration matrix** for maximum flexibility:
@@ -143,8 +153,8 @@ The system uses a **2x2 configuration matrix** for maximum flexibility:
 - **Data type dimension**: Financial data (fundamentals) vs Pricing data (market prices)
 
 This allows you to optimize for cost and quality by mixing different APIs. For example:
-- Use **FMP** for US fundamentals + **yfinance** for all pricing (saves money)
-- Use **TASE Data Hub** for Israeli fundamentals (most accurate) + **yfinance** for pricing
+- Use **TwelveData** for fundamentals + **yfinance** for all pricing (saves money)
+- Use **Alpha Vantage** for US fundamentals + **yfinance** for pricing
 
 ### Configuration Matrix
 
@@ -164,95 +174,95 @@ Configure via `.env`:
 
 | Source | TASE | US | Cost | Rate Limit | Best For |
 |--------|------|-----|------|------------|----------|
-| **EODHD** | ✓ | ✓ | $80/mo | High | Production (all-in-one) |
-| **TASE Data Hub** | ✓ | ✗ | Free/Paid | Medium | Israeli fundamentals (official) |
-| **FMP** | ✗ | ✓ | Free tier | 250/day | US fundamentals (budget) |
+| **TwelveData** | ✓ | ✓ | Pro plans from $29/mo | 610-1597/min | Primary (all data, production) |
 | **Alpha Vantage** | ✗ | ✓ | Free tier | 25/day | Light usage |
 | **yfinance** | ✓ | ✓ | FREE | Unlimited | Pricing data (recommended) |
-| **Investing.com** | ✓ | ✓ | Pro req. | Slow | Not recommended |
 
-#### 1. EODHD (EOD Historical Data)
+#### 1. TwelveData (Recommended Primary)
 - **Type**: Financial + Pricing
-- **Markets**: US, TASE, Global
-- **Key**: `EODHD_API_KEY`
-- **Best for**: All-in-one solution
-- **Test**: `python test_eodhd.py`
+- **Markets**: US, TASE, Global (60+ exchanges)
+- **Key**: `TWELVEDATA_API_KEY`
+- **Cost**: Pro 1597 plan - $XX/mo (1597 API credits/min, 1500 WebSocket credits, no daily limits)
+- **Best for**: Primary all-in-one data source for production use
+- **Performance**: Completes TASE125 fund build in ~2-3 minutes
+- **Rate Limits**:
+  - Pro 1597: 1597 credits/minute (recommended)
+  - No daily limits
+  - System includes automatic plan detection and credit tracking
+- **Credits per stock**:
+  - Financial data only: ~30 credits
+  - Pricing data only: ~70 credits
+  - Combined: ~100 credits
+- **Recommendation**: Use TwelveData for financial data, yfinance for pricing to save ~70% credits
+- **Signup**: https://twelvedata.com/
 
-#### 2. FMP (Financial Modeling Prep)
-- **Type**: Financial only
-- **Markets**: US stocks
-- **Key**: `FMP_API_KEY`
-- **Free tier**: 250 requests/day
-- **Best for**: US fundamentals on budget
-- **Test**: `python test_fmp.py`
-
-#### 3. TASE Data Hub
-- **Type**: Financial only
-- **Markets**: Israeli stocks (TA-125)
-- **Key**: `TASE_DATA_HUB_API_KEY`
-- **Best for**: Most accurate Israeli fundamentals (official exchange API)
-- **Note**: Uses yfinance fallback for pricing
-
-#### 4. Alpha Vantage
+#### 2. Alpha Vantage
 - **Type**: Financial + Pricing
 - **Markets**: US stocks only
 - **Key**: `ALPHAVANTAGE_API_KEY`
 - **Free tier**: 25 requests/day (very limited)
 - **Best for**: Light usage, testing
 
-#### 5. yfinance (Yahoo Finance)
+#### 3. yfinance (Yahoo Finance)
 - **Type**: Pricing only (limited fundamentals)
 - **Markets**: US, TASE, Global
 - **Key**: None (free, no API key needed)
 - **Best for**: All pricing data (highly recommended)
 - **Note**: Unlimited requests, very reliable
 
-#### 6. Investing.com (Web Scraper)
-- **Type**: Financial + Pricing
-- **Markets**: US, TASE, Global
-- **Credentials**: `INVESTING_EMAIL`, `INVESTING_PASSWORD`
-- **Best for**: Not recommended (slow, brittle)
-
 ### Recommended Configurations
 
-#### Optimal (Best Quality, Low Cost)
+#### Primary (Recommended - TwelveData + yfinance)
 ```bash
-US_FINANCIAL_DATA_SOURCE=fmp
+# Most cost-effective production setup
+US_FINANCIAL_DATA_SOURCE=twelvedata
+US_PRICING_DATA_SOURCE=yfinance          # Free! Saves ~70% credits
+TASE_FINANCIAL_DATA_SOURCE=twelvedata
+TASE_PRICING_DATA_SOURCE=yfinance        # Free! Saves ~70% credits
+```
+
+**Cost**: $XX/mo (TwelveData Pro 1597) + $0 (yfinance)
+**Performance**: TASE125 build in ~2-3 minutes
+**Credits used**: ~30 per stock (financial only)
+
+#### All-in-One (TwelveData for Everything)
+```bash
+# Simplest configuration, higher credit usage
+US_FINANCIAL_DATA_SOURCE=twelvedata
+US_PRICING_DATA_SOURCE=twelvedata
+TASE_FINANCIAL_DATA_SOURCE=twelvedata
+TASE_PRICING_DATA_SOURCE=twelvedata
+```
+
+**Cost**: $XX/mo (TwelveData Pro 1597)
+**Performance**: TASE125 build in ~4-5 minutes
+**Credits used**: ~100 per stock (financial + pricing)
+
+#### Alternative - Alpha Vantage + yfinance (US Only, Low Cost)
+```bash
+US_FINANCIAL_DATA_SOURCE=alphavantage
 US_PRICING_DATA_SOURCE=yfinance          # Free!
-TASE_FINANCIAL_DATA_SOURCE=tase_data_hub
+TASE_FINANCIAL_DATA_SOURCE=twelvedata
 TASE_PRICING_DATA_SOURCE=yfinance        # Free!
-```
-
-#### Universal (One API for Everything)
-```bash
-US_FINANCIAL_DATA_SOURCE=eodhd
-US_PRICING_DATA_SOURCE=eodhd
-TASE_FINANCIAL_DATA_SOURCE=eodhd
-TASE_PRICING_DATA_SOURCE=eodhd
-```
-
-#### Free Tier (Testing Only)
-```bash
-US_FINANCIAL_DATA_SOURCE=fmp             # 250 req/day
-US_PRICING_DATA_SOURCE=yfinance          # Unlimited
-TASE_FINANCIAL_DATA_SOURCE=              # Auto-select
-TASE_PRICING_DATA_SOURCE=yfinance        # Unlimited
 ```
 
 ### Auto-Selection Fallback Chains
 
 If you leave a source blank, the router auto-selects from these chains:
 
-- **US Financial**: fmp → alphavantage → eodhd
-- **US Pricing**: yfinance → eodhd → alphavantage
-- **TASE Financial**: tase_data_hub → eodhd
-- **TASE Pricing**: yfinance → eodhd
+- **US Financial**: twelvedata → alphavantage
+- **US Pricing**: yfinance → twelvedata → alphavantage
+- **TASE Financial**: twelvedata
+- **TASE Pricing**: yfinance → twelvedata
+
+**Default**: TwelveData is the system default if no configuration is provided.
 
 ### Data Source Priority
 
 Per [Fund_Update_Instructions.md](Fund_Update_Instructions.md:19-49):
-- **Official sources first**: SEC EDGAR (US), TASE/Maya (Israel)
-- **Backup sources**: Investing.com, Yahoo Finance, Google Finance
+- **Primary recommended source**: TwelveData (comprehensive coverage, requires Pro plan)
+- **Official sources for verification**: SEC EDGAR (US), TASE/Maya (Israel)
+- **Backup sources**: Yahoo Finance, Google Finance
 - Always document which source was used for each data point
 
 ### Testing Your Configuration
@@ -271,10 +281,6 @@ This will verify:
 
 ### Troubleshooting
 
-#### Problem: `AttributeError: 'FMPDataSource' object has no attribute 'get_stock_data'`
-
-**Solution**: You're using an old version. All sources now implement `get_stock_data()`. Update your code.
-
 #### Problem: `DataSourceAuthenticationError: Invalid API key`
 
 **Solution**:
@@ -289,35 +295,11 @@ This will verify:
 2. **Short-term**: Wait for rate limit to reset (check provider docs)
 3. **Long-term**: Switch to a different source or upgrade your plan
 
-Example - switch from Alpha Vantage to FMP:
+Example - switch from Alpha Vantage to TwelveData:
 ```bash
 # In .env
-US_FINANCIAL_DATA_SOURCE=fmp  # Changed from alphavantage
+US_FINANCIAL_DATA_SOURCE=twelvedata  # Changed from alphavantage
 ```
-
-#### Problem: Different sources give different financial data
-
-**Solution**: This is normal. APIs update at different times and may use different accounting standards.
-
-To compare sources for debugging:
-```python
-from data_sources.adapter import DataSourceAdapter
-
-adapter = DataSourceAdapter()
-comparison = adapter.compare_sources(
-    symbol="AAPL",
-    data1=fmp_data,
-    source1="FMP",
-    data2=eodhd_data,
-    source2="EODHD"
-)
-print(comparison)
-```
-
-Acceptable variances:
-- Price: ±2%
-- Market cap: ±5%
-- Revenue/income: ±10% (due to fiscal year differences)
 
 #### Problem: `ValueError: No financial data source available for SP500`
 
@@ -325,12 +307,12 @@ Acceptable variances:
 
 1. Check which keys you have in `.env`
 2. Configure at least one source for that market
-3. Test the source: `python test_fmp.py` (or test_eodhd.py, etc.)
+3. Test the source: `python tests/test_all_sources.py`
 
 Example fix:
 ```bash
 # Add to .env
-FMP_API_KEY=your-key-here
+TWELVEDATA_API_KEY=your-key-here
 ```
 
 ## Important Implementation Notes
@@ -357,20 +339,14 @@ Potential stocks have relaxed criteria:
 - 2+ years of positive net income
 - Complete growth data for 2 years
 
-### Selenium WebDriver Setup
-
-The [investing_scraper.py](data_sources/investing_scraper.py:52-81) uses:
-- `webdriver-manager` for automatic ChromeDriver installation
-- Headless mode option for automation
-- Anti-detection measures (`--disable-blink-features=AutomationControlled`)
-- Context manager support (`__enter__`/`__exit__`)
-
 ### Cache System
 
 [config/settings.py](config/settings.py:91) creates cache directories:
-- `cache/stocks_data/` - Individual stock financial data
-- `cache/index_constituents/` - Index member lists
-- Controlled by `USE_CACHE` environment variable
+- `cache/index_constituents/` - Index member lists (cached and reused between builds)
+- `cache/stocks_data/` - Individual stock data (saved for debugging only, NOT loaded during builds)
+- `logs/` - Data acquisition failure logs
+
+**Important**: Stock data is ALWAYS fetched fresh from APIs to ensure data quality. Cache files are saved for debugging and manual analysis but are never loaded during fund builds. This guarantees that all data is current and properly validated.
 
 ## Configuration
 
@@ -382,22 +358,22 @@ Create a `.env` file in the project root (see [.env.template](.env.template) for
 # ====================================================================
 
 # US stocks (S&P 500) - Financial data
-# Options: fmp, alphavantage, eodhd
-# Leave blank for auto-selection
-US_FINANCIAL_DATA_SOURCE=fmp
+# Options: twelvedata, alphavantage
+# Leave blank for auto-selection (defaults to twelvedata)
+US_FINANCIAL_DATA_SOURCE=twelvedata
 
 # US stocks (S&P 500) - Pricing data
-# Options: yfinance, eodhd, alphavantage
+# Options: yfinance, twelvedata, alphavantage
 # Recommended: yfinance (free!)
 US_PRICING_DATA_SOURCE=yfinance
 
 # Israeli stocks (TA-125) - Financial data
-# Options: tase_data_hub, eodhd, investing
-# Leave blank for auto-selection
-TASE_FINANCIAL_DATA_SOURCE=tase_data_hub
+# Options: twelvedata
+# Leave blank for auto-selection (defaults to twelvedata)
+TASE_FINANCIAL_DATA_SOURCE=twelvedata
 
 # Israeli stocks (TA-125) - Pricing data
-# Options: yfinance, eodhd, investing
+# Options: yfinance, twelvedata
 # Recommended: yfinance (free!)
 TASE_PRICING_DATA_SOURCE=yfinance
 
@@ -405,14 +381,8 @@ TASE_PRICING_DATA_SOURCE=yfinance
 # API Keys
 # ====================================================================
 
-EODHD_API_KEY=your-key-here
-FMP_API_KEY=your-key-here
-TASE_DATA_HUB_API_KEY=your-key-here
+TWELVEDATA_API_KEY=your-key-here
 ALPHAVANTAGE_API_KEY=your-key-here
-
-# Investing.com (not recommended)
-INVESTING_EMAIL=your-email@example.com
-INVESTING_PASSWORD=your-password
 
 # ====================================================================
 # Fund Parameters (auto-calculated if blank)
@@ -434,24 +404,22 @@ For simpler configuration, you can still use the old variables:
 
 ```bash
 # These work but are less flexible than the 2x2 matrix above
-FINANCIAL_DATA_SOURCE=eodhd  # Used for both US and TASE
-PRICING_DATA_SOURCE=yfinance  # Used for both US and TASE
+FINANCIAL_DATA_SOURCE=twelvedata  # Used for both US and TASE (current default)
+PRICING_DATA_SOURCE=yfinance       # Used for both US and TASE (recommended for cost savings)
 
 # Even older - used for everything:
-DATA_SOURCE=eodhd
+DATA_SOURCE=twelvedata  # Current system default
 ```
 
-The system automatically falls back to these legacy settings if the 2x2 matrix is not configured.
+The system automatically falls back to these legacy settings if the 2x2 matrix is not configured. **Default value is `twelvedata`** if no configuration is provided.
 
 ## Future Development Areas
 
 Based on TODO comments in the code:
 
-1. **EODHD Data Source Implementation** - Create [data_sources/eodhd_api.py](data_sources/eodhd_api.py) implementing `BaseDataSource`
-2. **Fund Builder Implementation** - [build_fund.py](build_fund.py:122-131) has placeholder steps
-3. **Financial Data Scraping** - [investing_scraper.py](data_sources/investing_scraper.py:240-245) needs full implementation
-4. **Scoring Algorithms** - Implement growth, momentum, and valuation calculations
-5. **LCM Calculation** - [Fund_Update_Instructions.md](Fund_Update_Instructions.md:163) minimum cost calculation
+1. **Fund Builder Implementation** - [build_fund.py](build_fund.py:122-131) has placeholder steps
+2. **Scoring Algorithms** - Implement growth, momentum, and valuation calculations
+3. **LCM Calculation** - [Fund_Update_Instructions.md](Fund_Update_Instructions.md:163) minimum cost calculation
 
 ## Key Design Patterns
 
@@ -459,4 +427,4 @@ Based on TODO comments in the code:
 - **Pydantic Models**: Type-safe data validation throughout
 - **Rich CLI**: Beautiful terminal UI with progress bars and panels
 - **Singleton Settings**: Single `settings` instance exported from config module
-- **Context Managers**: Selenium driver with automatic cleanup
+- **Context Managers**: Resource cleanup patterns

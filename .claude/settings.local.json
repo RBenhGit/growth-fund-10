@@ -3,14 +3,22 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(python build_fund.py:*)",
-      "Bash(python test_fmp.py:*)",
       "Bash(pkill:*)",
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(gh --version:*)",
       "Bash(gh repo create:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:twelvedata.com)",
+      "WebFetch(domain:support.twelvedata.com)",
+      "WebFetch(domain:datahubapi.tase.co.il)",
+      "Bash(ls:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:rapidapi.com)",
+      "WebFetch(domain:publicapi.dev)",
+      "WebFetch(domain:api.twelvedata.com)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

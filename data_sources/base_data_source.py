@@ -8,7 +8,12 @@ from models import FinancialData, MarketData, Stock
 
 
 class BaseDataSource(ABC):
-    """מחלקת בסיס למקורות נתונים"""
+    """מחלקת בסיס למקורות נתונים
+
+    Note: fiscal_dates are the actual fiscal year-end dates from financial statements
+    (e.g., ['2025-11-30', '2024-11-30', ...] for Adobe with Nov fiscal year-end).
+    These are used to fetch discrete price points rather than continuous daily history.
+    """
 
     @abstractmethod
     def login(self) -> bool:
@@ -53,15 +58,17 @@ class BaseDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_stock_market_data(self, symbol: str) -> MarketData:
+    def get_stock_market_data(self, symbol: str, fiscal_dates: Optional[List[str]] = None) -> MarketData:
         """
         שליפת נתוני שוק למניה
 
         Args:
             symbol: סימול המניה
+            fiscal_dates: רשימת תאריכי סוף שנת כספים (e.g., ['2025-11-30', '2024-12-31', ...])
+                         כאשר מסופק, יש לשלוף מחירי סגירה רק לתאריכים אלה + מחיר נוכחי
 
         Returns:
-            MarketData: נתוני שוק
+            MarketData: נתוני שוק עם מחירי סגירה לתאריכי fiscal + מחיר נוכחי
         """
         pass
 

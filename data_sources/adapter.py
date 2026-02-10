@@ -17,7 +17,8 @@ class DataSourceAdapter:
     """
 
     @staticmethod
-    def validate_financial_data(data: FinancialData, symbol: str, source: str) -> bool:
+    def validate_financial_data(data: FinancialData, symbol: str, source: str,
+                               is_index_constituent: bool = False) -> bool:
         """
         תיקוף נתונים פיננסיים - בדיקת שלמות ואיכות
         Validate financial data - check completeness and quality
@@ -26,6 +27,8 @@ class DataSourceAdapter:
             data: נתונים פיננסיים לתיקוף / Financial data to validate
             symbol: סימול המניה / Stock symbol
             source: שם מקור הנתונים / Data source name
+            is_index_constituent: אם True, יישום כללים מקלים עבור מניות במדד רשמי
+                                 If True, apply lenient rules for official index members
 
         Returns:
             bool: True אם הנתונים תקינים / True if data is valid
@@ -37,10 +40,13 @@ class DataSourceAdapter:
             issues.append("Missing revenues data")
         if not data.net_incomes:
             issues.append("Missing net income data")
-        if data.market_cap is None or data.market_cap <= 0:
-            issues.append("Invalid market cap")
-        if data.current_price is None or data.current_price <= 0:
-            issues.append("Invalid current price")
+
+        # NOTE: market_cap and current_price are NOT validated here.
+        # When using separate data sources (e.g., TwelveData for financials,
+        # yfinance for pricing), get_stock_financials() only fetches income
+        # statement, balance sheet, and cash flow — it does NOT call /quote
+        # or /statistics. market_cap and current_price belong to MarketData
+        # and are validated in validate_market_data() instead.
 
         # Check for data quality
         if data.total_debt and data.total_equity:
@@ -70,7 +76,8 @@ class DataSourceAdapter:
         return True
 
     @staticmethod
-    def validate_market_data(data: MarketData, symbol: str, source: str) -> bool:
+    def validate_market_data(data: MarketData, symbol: str, source: str,
+                            is_index_constituent: bool = False) -> bool:
         """
         תיקוף נתוני שוק
         Validate market data
@@ -79,6 +86,8 @@ class DataSourceAdapter:
             data: נתוני שוק לתיקוף / Market data to validate
             symbol: סימול המניה / Stock symbol
             source: שם מקור הנתונים / Data source name
+            is_index_constituent: אם True, יישום כללים מקלים עבור מניות במדד רשמי
+                                 If True, apply lenient rules for official index members
 
         Returns:
             bool: True אם הנתונים תקינים / True if data is valid
@@ -86,11 +95,25 @@ class DataSourceAdapter:
         issues = []
 
         if data.market_cap <= 0:
-            issues.append("Invalid market cap")
+            issues.append(f"Invalid market cap: {data.market_cap}")
+
+        # Lenient rule for index constituents - allow missing current price
         if data.current_price <= 0:
-            issues.append("Invalid current price")
-        if not data.price_history or len(data.price_history) < 50:
-            issues.append(f"Insufficient price history ({len(data.price_history) if data.price_history else 0} days)")
+            if is_index_constituent:
+                logger.warning(f"⚠️  {symbol}: Missing price but is index constituent, allowing")
+            else:
+                issues.append(f"Invalid current price: {data.current_price}")
+
+        # CRITICAL FIX: Price history contains fiscal date snapshots (5-6 years), not daily trading data
+        # This aligns with the credit-conserving design that fetches prices only for fiscal dates
+        min_fiscal_dates = 3 if is_index_constituent else 5
+        price_count = len(data.price_history) if data.price_history else 0
+
+        if not data.price_history or price_count < min_fiscal_dates:
+            if is_index_constituent and price_count >= 3:
+                logger.warning(f"⚠️  {symbol}: Only {price_count} price points, but allowing (index constituent)")
+            else:
+                issues.append(f"Insufficient price history: {price_count} fiscal dates (need {min_fiscal_dates})")
 
         if issues:
             logger.error(f"{symbol}: Market data quality issues from {source}: {', '.join(issues)}")
@@ -175,37 +198,31 @@ class DataSourceAdapter:
             str: סימול מנורמל / Normalized symbol
 
         Examples:
-            - AAPL + eodhd -> AAPL.US
-            - AAPL.US + fmp -> AAPL
+            - AAPL + alphavantage -> AAPL
             - LPSN.TA + yfinance -> LPSN.TA
         """
         # Remove existing suffix
         base_symbol = symbol.split('.')[0]
 
         # Apply source-specific formatting
-        if source == "eodhd":
-            # EODHD requires exchange suffix
-            if index_name == "SP500":
-                return f"{base_symbol}.US"
-            elif index_name == "TASE125":
-                return f"{base_symbol}.TA"
-        elif source in ["fmp", "alphavantage"]:
-            # FMP and Alpha Vantage use plain symbols for US stocks
+        if source == "alphavantage":
+            # Alpha Vantage uses plain symbols for US stocks
             if index_name == "SP500":
                 return base_symbol
             elif index_name == "TASE125":
-                # These sources may not support TASE
                 return f"{base_symbol}.TA"
         elif source == "yfinance":
             # yfinance uses exchange suffix for all markets
             if index_name == "SP500":
-                # US stocks can work with or without suffix, but .US is clearer
                 return base_symbol  # yfinance accepts AAPL for US stocks
             elif index_name == "TASE125":
                 return f"{base_symbol}.TA"
-        elif source == "tase_data_hub":
-            # TASE Data Hub uses plain symbols or special TASE format
-            return base_symbol
+        elif source == "twelvedata":
+            # TwelveData uses plain symbols for US, .TA for TASE
+            if index_name == "SP500":
+                return base_symbol
+            elif index_name == "TASE125":
+                return f"{base_symbol}.TA"
 
         # Default: return original symbol
         return symbol

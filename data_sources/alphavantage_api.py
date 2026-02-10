@@ -12,7 +12,6 @@ from datetime import datetime
 from collections import deque
 from models import FinancialData, MarketData
 from .base_data_source import BaseDataSource
-from .eodhd_api import EODHDDataSource
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -118,39 +117,12 @@ class AlphaVantageSource(BaseDataSource):
 
         Note:
             Alpha Vantage לא מספק רשימת רכיבי מדד.
-            נשתמש ב-fallback ל-EODHD עבור SP500.
-            TASE125 לא נתמך.
+            השתמש ב-TwelveData במקום.
         """
-        if index_name == "TASE125":
-            raise NotImplementedError(
-                "Alpha Vantage לא תומך במניות ישראליות (TASE125). "
-                "השתמש ב-TASE Data Hub או EODHD"
-            )
-
-        if index_name == "SP500":
-            # Fallback to EODHD for getting constituent list
-            logger.warning(
-                "Alpha Vantage לא מספק רשימת רכיבי מדד. "
-                "משתמש ב-EODHD לשליפת רשימת SP500"
-            )
-            try:
-                if not settings.EODHD_API_KEY:
-                    raise ValueError(
-                        "EODHD_API_KEY נדרש לשליפת רשימת SP500 "
-                        "(Alpha Vantage לא מספק רשימת רכיבים)"
-                    )
-
-                eodhd_source = EODHDDataSource()
-                constituents = eodhd_source.get_index_constituents(index_name)
-                logger.info(f"נשלפו {len(constituents)} רכיבים מ-EODHD (fallback)")
-                return constituents
-
-            except Exception as e:
-                raise RuntimeError(
-                    f"שגיאה בשליפת רכיבי SP500 (fallback ל-EODHD נכשל): {e}"
-                )
-
-        raise ValueError(f"מדד לא נתמך: {index_name}")
+        raise NotImplementedError(
+            f"Alpha Vantage לא מספק רשימת רכיבי מדד עבור {index_name}. "
+            "השתמש ב-TwelveData או yfinance"
+        )
 
     def _parse_annual_reports(self, reports: list, field_name: str, years: int) -> Dict[int, float]:
         """
@@ -307,12 +279,13 @@ class AlphaVantageSource(BaseDataSource):
         except (KeyError, ValueError) as e:
             raise RuntimeError(f"שגיאה בעיבוד נתונים פיננסיים עבור {symbol}: {e}")
 
-    def get_stock_market_data(self, symbol: str) -> MarketData:
+    def get_stock_market_data(self, symbol: str, fiscal_dates=None) -> MarketData:
         """
         שליפת נתוני שוק למניה
 
         Args:
             symbol: סימול המניה
+            fiscal_dates: רשימת תאריכי fiscal (אופציונלי, לא בשימוש כרגע)
 
         Returns:
             MarketData: נתוני שוק
@@ -358,11 +331,6 @@ class AlphaVantageSource(BaseDataSource):
                 current_price = info.get('currentPrice') or info.get('regularMarketPrice')
                 if current_price:
                     current_price = float(current_price)
-
-                # Add current price to history
-                if current_price:
-                    current_date = datetime.now().strftime("%Y-%m-%d")
-                    price_history[current_date] = current_price
 
             except Exception:
                 pass

@@ -35,19 +35,19 @@ class Settings:
     #   - Financial data (fundamentals) vs Pricing data (market prices)
 
     # US Stocks (SP500) - Financial Data
-    # Options: fmp, alphavantage, eodhd
+    # Options: twelvedata, alphavantage
     US_FINANCIAL_DATA_SOURCE = os.getenv("US_FINANCIAL_DATA_SOURCE", "")
 
     # US Stocks (SP500) - Pricing Data
-    # Options: yfinance, eodhd, alphavantage
+    # Options: yfinance, twelvedata, alphavantage
     US_PRICING_DATA_SOURCE = os.getenv("US_PRICING_DATA_SOURCE", "yfinance")
 
     # TASE Stocks (TA-125) - Financial Data
-    # Options: tase_data_hub, eodhd, investing
+    # Options: twelvedata
     TASE_FINANCIAL_DATA_SOURCE = os.getenv("TASE_FINANCIAL_DATA_SOURCE", "")
 
     # TASE Stocks (TA-125) - Pricing Data
-    # Options: yfinance, eodhd, investing
+    # Options: yfinance, twelvedata
     TASE_PRICING_DATA_SOURCE = os.getenv("TASE_PRICING_DATA_SOURCE", "yfinance")
 
     # ====================================================================
@@ -75,28 +75,18 @@ class Settings:
         TASE_PRICING_DATA_SOURCE = TASE_PRICING_DATA_SOURCE or legacy_all
 
     # Keep legacy variables for backwards compatibility
-    FINANCIAL_DATA_SOURCE = US_FINANCIAL_DATA_SOURCE or TASE_FINANCIAL_DATA_SOURCE or "eodhd"
+    FINANCIAL_DATA_SOURCE = US_FINANCIAL_DATA_SOURCE or TASE_FINANCIAL_DATA_SOURCE or "twelvedata"
     PRICING_DATA_SOURCE = US_PRICING_DATA_SOURCE or "yfinance"
-
-    # Investing.com credentials
-    INVESTING_EMAIL = os.getenv("INVESTING_EMAIL")
-    INVESTING_PASSWORD = os.getenv("INVESTING_PASSWORD")
-
-    # EOD Historical Data API
-    EODHD_API_KEY = os.getenv("EODHD_API_KEY")
 
     # Alpha Vantage API
     ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
     ALPHAVANTAGE_RATE_LIMIT = os.getenv("ALPHAVANTAGE_RATE_LIMIT", "paid")
 
-    # Financial Modeling Prep API
-    FMP_API_KEY = os.getenv("FMP_API_KEY")
-
     # Twelve Data API
     TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
-
-    # TASE Data Hub API (Israel Stock Exchange - Official)
-    TASE_DATA_HUB_API_KEY = os.getenv("TASE_DATA_HUB_API_KEY")
+    # Rate limit overrides (0 = auto-detect from API)
+    TWELVEDATA_CREDITS_PER_MINUTE = int(os.getenv("TWELVEDATA_CREDITS_PER_MINUTE", "0"))
+    TWELVEDATA_MAX_STOCKS_PER_MINUTE = int(os.getenv("TWELVEDATA_MAX_STOCKS_PER_MINUTE", "0"))
 
     # הגדרות קרן
     FUND_QUARTER: Optional[str] = os.getenv("FUND_QUARTER") or None
@@ -144,34 +134,10 @@ class Settings:
             bool: True אם ההגדרות תקינות
         """
         # בדיקת מקור נתונים פיננסיים
-        if cls.FINANCIAL_DATA_SOURCE == "eodhd":
-            if not cls.EODHD_API_KEY:
-                raise ValueError(
-                    "EODHD_API_KEY must be set in .env when using EODHD for financial data"
-                )
-
-        if cls.FINANCIAL_DATA_SOURCE == "fmp":
-            if not cls.FMP_API_KEY:
-                raise ValueError(
-                    "FMP_API_KEY must be set in .env when using FMP for financial data"
-                )
-
-        if cls.FINANCIAL_DATA_SOURCE == "investing":
-            if not cls.INVESTING_EMAIL or not cls.INVESTING_PASSWORD:
-                raise ValueError(
-                    "INVESTING_EMAIL and INVESTING_PASSWORD must be set in .env when using Investing.com"
-                )
-
         if cls.FINANCIAL_DATA_SOURCE == "alphavantage":
             if not cls.ALPHAVANTAGE_API_KEY:
                 raise ValueError(
                     "ALPHAVANTAGE_API_KEY must be set in .env when using Alpha Vantage"
-                )
-
-        if cls.FINANCIAL_DATA_SOURCE == "tase_data_hub":
-            if not cls.TASE_DATA_HUB_API_KEY:
-                raise ValueError(
-                    "TASE_DATA_HUB_API_KEY must be set in .env when using TASE Data Hub"
                 )
 
         if cls.FINANCIAL_DATA_SOURCE == "twelvedata":
@@ -182,12 +148,6 @@ class Settings:
 
         # בדיקת מקור מחירים
         # yfinance לא דורש API key, אבל מקורות אחרים כן
-        if cls.PRICING_DATA_SOURCE == "eodhd":
-            if not cls.EODHD_API_KEY:
-                raise ValueError(
-                    "EODHD_API_KEY must be set in .env when using EODHD for pricing"
-                )
-
         if cls.PRICING_DATA_SOURCE == "alphavantage":
             if not cls.ALPHAVANTAGE_API_KEY:
                 raise ValueError(
@@ -233,16 +193,11 @@ class Settings:
         # בדוק מפתחות API עבור כל מקור
         missing = []
         for source in sources_needed:
-            if source == "eodhd" and not cls.EODHD_API_KEY:
-                missing.append(f"{source} requires EODHD_API_KEY")
-            elif source == "fmp" and not cls.FMP_API_KEY:
-                missing.append(f"{source} requires FMP_API_KEY")
-            elif source == "tase_data_hub" and not cls.TASE_DATA_HUB_API_KEY:
-                missing.append(f"{source} requires TASE_DATA_HUB_API_KEY")
-            elif source == "alphavantage" and not cls.ALPHAVANTAGE_API_KEY:
+            if source == "alphavantage" and not cls.ALPHAVANTAGE_API_KEY:
                 missing.append(f"{source} requires ALPHAVANTAGE_API_KEY")
-            elif source == "investing" and not (cls.INVESTING_EMAIL and cls.INVESTING_PASSWORD):
-                missing.append(f"{source} requires INVESTING_EMAIL and INVESTING_PASSWORD")
+            elif source == "twelvedata" and not cls.TWELVEDATA_API_KEY:
+                missing.append(f"{source} requires TWELVEDATA_API_KEY")
+
 
         if missing:
             raise ValueError(f"Missing API keys:\n  - " + "\n  - ".join(missing))

@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  growth-fund-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: growth-fund-builder
+    env_file:
+      - .env
+    volumes:
+      # Mount cache directories for persistence
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+      - ./Fund_Docs:/app/Fund_Docs
+    environment:
+      - USE_CACHE=true
+      - DEBUG_MODE=false
+    command: ["--index", "SP500"]
+    restart: "no"
+
+  # Service for TASE125 builds
+  growth-fund-builder-tase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: growth-fund-builder-tase
+    env_file:
+      - .env
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+      - ./Fund_Docs:/app/Fund_Docs
+    environment:
+      - USE_CACHE=true
+      - DEBUG_MODE=false
+    command: ["--index", "TASE125"]
+    restart: "no"
+
+  # Test service
+  test-sources:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: growth-fund-test
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    entrypoint: ["python"]
+    command: ["tests/test_all_sources.py"]
+    restart: "no"

@@ -618,6 +618,120 @@ class TwelveDataSource(BaseDataSource):
         # Return both financial data and fiscal dates (to avoid duplicate API call)
         return financial_data, fiscal_dates
 
+    def get_quarterly_financials(self, symbol: str, num_quarters: int = 4) -> dict:
+        """
+        שליפת נתונים פיננסיים רבעוניים למניה (לחישוב LTM)
+
+        3 API calls: income_statement, balance_sheet, cash_flow (period=quarterly)
+
+        Args:
+            symbol: סימול המניה (e.g., NVDA.US)
+            num_quarters: מספר רבעונים לשלוף (ברירת מחדל: 4 עבור LTM)
+
+        Returns:
+            dict עם נתונים רבעוניים:
+                quarterly_revenues: list of (fiscal_date, amount)
+                quarterly_net_incomes: list of (fiscal_date, amount)
+                quarterly_operating_incomes: list of (fiscal_date, amount)
+                quarterly_operating_cash_flows: list of (fiscal_date, amount)
+                total_debt: float (from latest quarter balance sheet)
+                total_equity: float (from latest quarter balance sheet)
+        """
+        self._wait_for_rate_limit()
+
+        clean_sym = self._clean_symbol(symbol)
+        exchange = self._get_exchange(symbol)
+
+        params = {"symbol": clean_sym, "period": "quarterly"}
+        if exchange:
+            params["exchange"] = exchange
+
+        result = {
+            "quarterly_revenues": [],
+            "quarterly_net_incomes": [],
+            "quarterly_operating_incomes": [],
+            "quarterly_operating_cash_flows": [],
+            "total_debt": 0.0,
+            "total_equity": 0.0,
+        }
+
+        # API Call 1: Quarterly Income Statement
+        try:
+            income_data = self._api_request("/income_statement", params)
+            statements = income_data.get("income_statement", [])
+
+            for stmt in statements[:num_quarters]:
+                fiscal_date = stmt.get("fiscal_date", "")
+                if not fiscal_date:
+                    continue
+
+                sales = stmt.get("sales")
+                ni = stmt.get("net_income")
+                oi = stmt.get("operating_income")
+
+                # Fallback for operating income
+                if oi is None:
+                    oi = stmt.get("pretax_income")
+                if oi is None:
+                    oi = stmt.get("ebitda")
+
+                result["quarterly_revenues"].append(
+                    (fiscal_date, float(sales) if sales is not None else 0.0)
+                )
+                result["quarterly_net_incomes"].append(
+                    (fiscal_date, float(ni) if ni is not None else 0.0)
+                )
+                result["quarterly_operating_incomes"].append(
+                    (fiscal_date, float(oi) if oi is not None else 0.0)
+                )
+        except RuntimeError as e:
+            logger.error(f"Failed to fetch quarterly income statement for {symbol}: {e}")
+            raise
+
+        # API Call 2: Quarterly Balance Sheet (latest only for debt/equity snapshot)
+        try:
+            balance_data = self._api_request("/balance_sheet", params)
+            sheets = balance_data.get("balance_sheet", [])
+            if sheets:
+                latest = sheets[0]
+
+                liabilities = latest.get("liabilities", {})
+                non_current = liabilities.get("non_current_liabilities", {})
+                ltd = non_current.get("long_term_debt")
+                result["total_debt"] = float(ltd) if ltd is not None else 0.0
+
+                equity_section = latest.get("shareholders_equity", {})
+                te = equity_section.get("total_shareholders_equity")
+                if te is not None:
+                    result["total_equity"] = float(te)
+                else:
+                    common = equity_section.get("common_stock_equity")
+                    result["total_equity"] = float(common) if common is not None else 0.0
+        except RuntimeError as e:
+            logger.warning(f"Failed to fetch quarterly balance sheet for {symbol}: {e}")
+
+        # API Call 3: Quarterly Cash Flow
+        try:
+            cf_data = self._api_request("/cash_flow", params)
+            flows = cf_data.get("cash_flow", [])
+            for flow in flows[:num_quarters]:
+                fiscal_date = flow.get("fiscal_date", "")
+                if not fiscal_date:
+                    continue
+
+                ops = flow.get("operating_activities", {})
+                ocf = ops.get("operating_cash_flow")
+                result["quarterly_operating_cash_flows"].append(
+                    (fiscal_date, float(ocf) if ocf is not None else 0.0)
+                )
+        except RuntimeError as e:
+            logger.warning(f"Failed to fetch quarterly cash flow for {symbol}: {e}")
+
+        logger.debug(
+            f"{symbol}: Fetched {len(result['quarterly_revenues'])} quarters of data"
+        )
+        return result
+
     def get_stock_market_data(self, symbol: str, fiscal_dates: Optional[List[str]] = None) -> MarketData:
         """
         שליפת נתוני שוק למניה

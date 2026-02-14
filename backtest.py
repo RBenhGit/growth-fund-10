@@ -745,8 +745,8 @@ def main():
     )
     parser.add_argument(
         '--output-dir',
-        default='Fund_Docs',
-        help='תיקיית פלט לדוחות וגרפים'
+        default=None,
+        help='תיקיית פלט לדוחות וגרפים (ברירת מחדל: אותה תיקייה כמו קובץ הקרן)'
     )
 
     args = parser.parse_args()
@@ -756,6 +756,9 @@ def main():
         console.print(f"[red]שגיאה: קובץ הקרן לא נמצא: {args.fund_file}[/red]")
         return
 
+    # Default output dir = same directory as fund file
+    output_dir = args.output_dir or str(Path(args.fund_file).parent)
+
     # הרצת הבדיקה הרטרוספקטיבית
     console.print("[bold cyan]מתחיל בדיקה רטרוספקטיבית של קרן הצמיחה...[/bold cyan]\n")
 
@@ -764,8 +767,8 @@ def main():
 
     if results:
         backtest.generate_report(results)
-        backtest.plot_results(results, args.output_dir)
-        backtest.save_report_to_file(results, args.output_dir)
+        backtest.plot_results(results, output_dir)
+        backtest.save_report_to_file(results, output_dir)
         console.print("\n[bold green]הבדיקה הרטרוספקטיבית הושלמה בהצלחה![/bold green]")
     else:
         console.print("\n[bold red]הבדיקה הרטרוספקטיבית נכשלה[/bold red]")

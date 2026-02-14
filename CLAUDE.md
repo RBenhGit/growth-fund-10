@@ -27,6 +27,18 @@ python build_fund.py --index SP500 --no-cache
 python build_fund.py --index TASE125 --debug
 ```
 
+### Quarterly Update (LTM-based)
+```bash
+# Update fund using LTM data (requires previous full build)
+python build_fund.py --index SP500 --update
+
+# Preview changes without saving files
+python build_fund.py --index SP500 --update --dry-run
+
+# Update for specific quarter
+python build_fund.py --index SP500 --quarter Q2 --year 2026 --update
+```
+
 ### Testing Data Sources
 ```bash
 # Run comprehensive data source tests
@@ -61,39 +73,63 @@ pip install -r requirements.txt
 - [data_sources/twelvedata_api.py](data_sources/twelvedata_api.py) - TwelveData API (recommended primary source)
 - [data_sources/yfinance_source.py](data_sources/yfinance_source.py) - Yahoo Finance wrapper (free, recommended for pricing)
 
+**Quarterly Update Components:**
+- [fund_builder/updater.py](fund_builder/updater.py) - `QuarterlyUpdater` orchestrator for LTM-based rebalancing
+- [utils/update_parser.py](utils/update_parser.py) - Parses previous `_Update.md` to extract candidate stocks
+- [utils/cache_loader.py](utils/cache_loader.py) - Loads cached `Stock` objects from `cache/stocks_data/*.json`
+- [utils/ltm_calculator.py](utils/ltm_calculator.py) - Converts quarterly data to LTM values, merges into Stock
+- [utils/changelog.py](utils/changelog.py) - Appends entries to `Fund_Docs/CHANGELOG.md`
+
 **Utilities:**
 - [utils/date_utils.py](utils/date_utils.py) - Quarter/year calculations, fund naming conventions
   - `get_quarter_and_year()` - Determines Q1-Q4 based on current month
   - `format_fund_name()` - Creates standardized fund names (e.g., "Fund_10_TASE_Q4_2025")
+  - `get_fund_output_dir()` - Returns `Fund_Docs/{INDEX}/{Q}_{YEAR}/` path
+  - `find_latest_fund_dir()` - Scans for most recent quarter folder
+  - `find_previous_fund_dir()` - Finds the quarter folder before the current one
 
 ### Directory Structure
 ```
-├── build_fund.py           # Main entry point
-├── config/                 # Configuration management
-│   └── settings.py
-├── models/                 # Pydantic data models
-│   ├── stock.py           # Stock model with eligibility logic
-│   ├── fund.py            # Fund composition model
-│   └── financial_data.py  # Financial metrics models
-├── data_sources/          # Data fetching implementations
-│   ├── base_data_source.py    # Abstract interface
-│   ├── router.py              # Data source routing system
-│   ├── adapter.py             # Validation & normalization
-│   ├── twelvedata_api.py      # TwelveData (recommended)
-│   ├── yfinance_source.py     # Yahoo Finance (free pricing)
-│   └── alphavantage_api.py    # Alpha Vantage (US only)
-├── tests/                 # Test suite
+├── build_fund.py           # Main entry point (full build + --update)
+├── backtest.py             # Backtesting engine
+├── config/
+│   └── settings.py         # Configuration management
+├── models/
+│   ├── stock.py            # Stock model with eligibility logic
+│   ├── fund.py             # Fund composition model
+│   └── financial_data.py   # Financial metrics models
+├── data_sources/
+│   ├── base_data_source.py     # Abstract interface
+│   ├── router.py               # Data source routing system
+│   ├── adapter.py              # Validation & normalization
+│   ├── twelvedata_api.py       # TwelveData (recommended)
+│   ├── yfinance_source.py      # Yahoo Finance (free pricing)
+│   └── alphavantage_api.py     # Alpha Vantage (US only)
+├── fund_builder/
+│   ├── fund_builder.py         # Full fund construction logic
+│   └── updater.py              # Quarterly LTM-based update
+├── utils/
+│   ├── date_utils.py           # Date/quarter/folder utilities
+│   ├── update_parser.py        # Parse _Update.md for candidates
+│   ├── cache_loader.py         # Load Stock objects from cache
+│   ├── ltm_calculator.py       # LTM calculation & merging
+│   ├── changelog.py            # CHANGELOG.md management
+│   └── migrate_fund_docs.py    # One-time folder migration
+├── tests/
 │   ├── test_all_sources.py
-│   ├── test_current_data.py
-│   ├── test_price_alignment.py
-│   ├── test_symbol_normalization.py
-│   ├── test_tase_api.py
-│   └── verify_index.py
-├── utils/                 # Helper utilities
-│   └── date_utils.py
-├── fund_builder/          # Fund construction logic
-├── cache/                 # Cached data (stocks, index constituents)
-└── Fund_Docs/             # Generated fund documentation
+│   ├── test_quarterly_update.py
+│   └── ...
+├── cache/
+│   ├── stocks_data/        # Stock JSON files (598+ files)
+│   └── index_constituents/ # Index member lists
+└── Fund_Docs/              # Generated fund documentation
+    ├── CHANGELOG.md        # Fund composition changes log
+    ├── SP500/
+    │   ├── Q1_2026/        # Fund_10_SP500_Q1_2026*.md
+    │   └── Q4_2025/        # Fund_10_SP500_Q4_2025*.md
+    └── TASE125/
+        ├── Q1_2026/
+        └── Q4_2025/
 ```
 
 ## Fund Building Process
@@ -120,6 +156,42 @@ The system follows a 14-step process:
 12. **Create Update Document** - With all scoring tables
 13. **Create Final Fund Documents** - Separate files for TASE and SP500
 14. **Validation** - Verify weights sum to 100%, no overlaps, whole shares
+
+## Quarterly Update Process (LTM-based)
+
+The `--update` flag runs a lighter rebalancing instead of a full 500+ stock rebuild:
+
+1. **Find Previous Update.md** — Locates latest `_Update.md` from `Fund_Docs/{INDEX}/`
+2. **Parse Candidates** — Extracts top 30 base + top 20 potential stocks (~50 unique symbols)
+3. **Load Cached Stocks** — Reads full `Stock` objects from `cache/stocks_data/*.json`
+4. **Fetch Quarterly Data** — Calls TwelveData with `period=quarterly` for 4 quarters
+5. **Calculate LTM** — Sums last 4 quarters: revenue, net income, operating income, cash flow
+6. **Merge LTM into Stocks** — Adds LTM year to financial history, refreshes pricing via yfinance
+7. **Re-check Eligibility** — Applies same base/potential criteria
+8. **Re-score and Rank** — Uses identical scoring weights as full build
+9. **Build Fund** — Select 6 base + 4 potential, assign weights, calculate minimum cost
+10. **Compare & Report** — Generate Comparison.md, append to CHANGELOG.md
+
+**Cost**: ~50 stocks x ~600 credits = ~30K credits (vs ~300K for full rebuild)
+
+### Update vs Full Build
+
+| | Full Build (`--index SP500`) | Quarterly Update (`--update`) |
+|---|---|---|
+| Stocks processed | 500+ (full index) | ~50 (top candidates) |
+| Data source | Annual financials from API | Quarterly LTM from API + cache |
+| API cost | ~300K credits | ~30K credits |
+| Runtime | ~45 min | ~5 min |
+| Prerequisite | None | Previous full build with cache |
+
+### Output Files (per quarter)
+
+```
+Fund_Docs/{INDEX}/{Q}_{YEAR}/
+  Fund_10_{INDEX}_{Q}_{YEAR}.md           # Final fund composition
+  Fund_10_{INDEX}_{Q}_{YEAR}_Update.md    # Detailed scoring tables
+  Fund_10_{INDEX}_{Q}_{YEAR}_Comparison.md  # Diff vs previous quarter
+```
 
 ### Scoring System Constants
 

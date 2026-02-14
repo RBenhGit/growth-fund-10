@@ -34,7 +34,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from config import settings
-from utils.date_utils import get_quarter_and_year, format_fund_name, get_current_date_string
+from utils.date_utils import get_quarter_and_year, format_fund_name, get_current_date_string, get_fund_output_dir
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,8 @@ def parse_arguments():
   python build_fund.py --index TASE125
   python build_fund.py --index SP500 --quarter Q4 --year 2025
   python build_fund.py --index SP500 --no-cache
+  python build_fund.py --index SP500 --update
+  python build_fund.py --index SP500 --update --dry-run
         """
     )
 
@@ -86,6 +88,18 @@ def parse_arguments():
         "--debug",
         action="store_true",
         help="מצב debug (פלט מפורט)"
+    )
+
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="עדכון רבעוני (מבוסס LTM) במקום בנייה מלאה"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="תצוגה מקדימה בלבד (ללא שמירת קבצים, למצב --update)"
     )
 
     return parser.parse_args()
@@ -433,7 +447,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
 
     # תיקיות cache ופלט
     cache_dir = settings.CACHE_DIR / "stocks_data"
-    output_dir = settings.OUTPUT_DIR
+    output_dir = get_fund_output_dir(settings.OUTPUT_DIR, index_name, quarter, year)
     cache_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1089,18 +1103,27 @@ def main():
         sys.exit(1)
 
     # הצגת פרמטרים
+    mode = "עדכון רבעוני (LTM)" if args.update else "בנייה מלאה"
     console.print("[bold]פרמטרים:[/bold]")
+    console.print(f"  מצב: [cyan]{mode}[/cyan]")
     console.print(f"  מדד: [cyan]{args.index}[/cyan]")
     console.print(f"  רבעון: [cyan]{quarter}[/cyan]")
     console.print(f"  שנה: [cyan]{year}[/cyan]")
-    console.print(f"  שימוש ב-cache: [cyan]{'כן' if use_cache else 'לא'}[/cyan]")
+    if not args.update:
+        console.print(f"  שימוש ב-cache: [cyan]{'כן' if use_cache else 'לא'}[/cyan]")
     console.print(f"  נתונים פיננסיים: [cyan]{settings.FINANCIAL_DATA_SOURCE}[/cyan]")
     console.print(f"  נתוני מחירים: [cyan]{settings.PRICING_DATA_SOURCE}[/cyan]")
+    if args.dry_run:
+        console.print(f"  [yellow]מצב תצוגה מקדימה (dry-run)[/yellow]")
     console.print()
 
-    # בניית הקרן
     try:
-        build_fund(args.index, quarter, year, use_cache)
+        if args.update:
+            # עדכון רבעוני
+            _run_quarterly_update(args.index, quarter, year, args)
+        else:
+            # בנייה מלאה
+            build_fund(args.index, quarter, year, use_cache)
     except KeyboardInterrupt:
         console.print("\n[yellow]התהליך בוטל על ידי המשתמש[/yellow]")
         sys.exit(0)
@@ -1109,6 +1132,43 @@ def main():
         if settings.DEBUG_MODE:
             console.print_exception()
         sys.exit(1)
+
+
+def _run_quarterly_update(index_name: str, quarter: str, year: int, args):
+    """
+    מריץ תהליך עדכון רבעוני
+
+    Args:
+        index_name: שם המדד
+        quarter: רבעון
+        year: שנה
+        args: ארגומנטים משורת הפקודה
+    """
+    from fund_builder.updater import QuarterlyUpdater
+    from data_sources.router import DataSourceRouter
+
+    router = DataSourceRouter()
+    financial_source = router.get_financial_source(index_name)
+    pricing_source = router.get_pricing_source(index_name)
+
+    # Login to data sources
+    try:
+        financial_source.login()
+    except Exception as e:
+        console.print(f"[red]שגיאה בחיבור למקור נתונים פיננסיים: {e}[/red]")
+        sys.exit(1)
+
+    try:
+        pricing_source.login()
+    except Exception:
+        pass  # yfinance doesn't need login
+
+    updater = QuarterlyUpdater(index_name, quarter, year)
+    fund, comparison = updater.run_update(
+        financial_source=financial_source,
+        pricing_source=pricing_source,
+        dry_run=args.dry_run,
+    )
 
 
 if __name__ == "__main__":

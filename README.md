@@ -9,6 +9,7 @@ An automated system for building and managing investment portfolios based on sto
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Running the App](#running-the-app)
+- [Quarterly Updates](#quarterly-update-ltm-based-rebalancing)
 - [Backtesting](#backtesting)
 - [Testing Data Sources](#testing-data-sources)
 - [Project Structure](#project-structure)
@@ -19,6 +20,7 @@ An automated system for building and managing investment portfolios based on sto
 - **Dual-Market Support**: Works with both Israeli (TA-125) and US (S&P500) stocks
 - **Hybrid Data Sources**: Uses TwelveData API for financial data and yfinance for pricing
 - **Automated Scoring**: Multi-factor scoring system for stock selection
+- **Quarterly Updates**: LTM-based rebalancing using cached data (~10x cheaper than full rebuild)
 - **Smart Caching**: Reduces API calls and improves performance
 - **Beautiful CLI**: Rich terminal UI with progress bars and tables
 - **Hebrew Support**: Full Hebrew language support for Israeli market
@@ -146,6 +148,25 @@ python build_fund.py --index SP500 --debug
 python build_fund.py --index SP500 --quarter Q1 --year 2025 --no-cache --debug
 ```
 
+### Quarterly Update (LTM-based Rebalancing)
+
+Instead of rebuilding from scratch (500+ stocks), update an existing fund using the top ~50 candidates:
+
+```bash
+# Update fund using latest quarterly (LTM) data
+python build_fund.py --index SP500 --update
+
+# Preview changes without saving
+python build_fund.py --index SP500 --update --dry-run
+
+# Update for a specific quarter
+python build_fund.py --index SP500 --quarter Q2 --year 2026 --update
+```
+
+**How it works**: Parses the previous `_Update.md` to identify top candidates, loads cached financial data, fetches 4 quarters of financial reports from TwelveData, computes LTM (Last Twelve Months) values, and re-scores all candidates.
+
+**Cost**: ~30K API credits vs ~300K for a full rebuild.
+
 ### Command Line Arguments
 
 | Argument | Description | Required | Default |
@@ -153,21 +174,27 @@ python build_fund.py --index SP500 --quarter Q1 --year 2025 --no-cache --debug
 | `--index` | Index name (`TASE125` or `SP500`) | Yes | - |
 | `--quarter` | Quarter (`Q1`, `Q2`, `Q3`, `Q4`) | No | Auto-detected |
 | `--year` | Year (e.g., `2025`) | No | Current year |
+| `--update` | Run quarterly LTM update instead of full build | No | Full build |
+| `--dry-run` | Preview update changes without saving | No | Disabled |
 | `--no-cache` | Force refresh all data | No | Use cache |
 | `--debug` | Enable verbose output | No | Disabled |
 
 ### Output
 
-The app generates two markdown files in the `Fund_Docs/` directory:
+Fund documents are organized by index and quarter:
 
-1. **`Fund_10_[INDEX]_[Q]_[YEAR].md`** - Final fund composition
-2. **`Fund_10_[INDEX]_[Q]_[YEAR]_Update.md`** - Detailed scoring tables
-
-**Example output:**
 ```
 Fund_Docs/
-├── Fund_10_SP500_Q4_2025.md
-└── Fund_10_SP500_Q4_2025_Update.md
+├── CHANGELOG.md
+├── SP500/
+│   ├── Q1_2026/
+│   │   ├── Fund_10_SP500_Q1_2026.md           # Fund composition
+│   │   ├── Fund_10_SP500_Q1_2026_Update.md    # Scoring tables
+│   │   └── Fund_10_SP500_Q1_2026_Comparison.md  # Diff vs previous
+│   └── Q4_2025/
+│       └── ...
+└── TASE125/
+    └── ...
 ```
 
 ## 📈 Backtesting
@@ -254,7 +281,7 @@ Tests:
 
 ```
 קרן צמיחה 10/
-├── build_fund.py              # Main application entry point
+├── build_fund.py              # Main entry point (full build + --update)
 ├── backtest.py                # Backtesting engine
 ├── config/
 │   └── settings.py            # Configuration management
@@ -268,14 +295,20 @@ Tests:
 │   ├── yfinance_source.py     # Yahoo Finance (free pricing)
 │   └── alphavantage_api.py    # Alpha Vantage API (US only)
 ├── fund_builder/
-│   └── fund_builder.py        # Fund construction logic
+│   ├── fund_builder.py        # Full fund construction logic
+│   └── updater.py             # Quarterly LTM-based update
 ├── utils/
-│   └── date_utils.py          # Date/quarter utilities
+│   ├── date_utils.py          # Date/quarter/folder utilities
+│   ├── update_parser.py       # Parse _Update.md for candidates
+│   ├── cache_loader.py        # Load Stock objects from cache
+│   ├── ltm_calculator.py      # LTM calculation & merging
+│   └── changelog.py           # CHANGELOG.md management
 ├── tests/                     # Test suite
 │   ├── test_all_sources.py
+│   ├── test_quarterly_update.py
 │   └── ...
 ├── cache/                     # Cached data (auto-created)
-├── Fund_Docs/                 # Generated fund documents
+├── Fund_Docs/                 # Generated fund documents (by index/quarter)
 ├── requirements.txt           # Python dependencies
 ├── .env                       # Configuration (create from template)
 └── README.md                  # This file
@@ -399,14 +432,14 @@ python build_fund.py --index SP500
 ### Regular Usage
 
 ```bash
-# Monthly: Update fund for new quarter
-python build_fund.py --index SP500 --quarter Q1 --year 2025
+# Quarterly: Run lightweight LTM-based update
+python build_fund.py --index SP500 --update
 
-# Weekly: Refresh data without cache
-python build_fund.py --index TASE125 --no-cache
+# Quarterly: Full rebuild from scratch (when needed)
+python build_fund.py --index SP500 --quarter Q2 --year 2026
 
 # Quarterly: Run backtest on latest fund
-python backtest.py Fund_Docs/Fund_10_SP500_Q4_2025.md --years 10
+python backtest.py Fund_Docs/SP500/Q1_2026/Fund_10_SP500_Q1_2026.md --years 10
 ```
 
 ## 🤝 Contributing
@@ -435,4 +468,4 @@ Private research project. Not for distribution or commercial use.
 
 **Made with ❤️ for systematic investing**
 
-*Last updated: December 2025*
+*Last updated: February 2026*

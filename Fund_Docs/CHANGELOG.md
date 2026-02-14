@@ -52,3 +52,21 @@
 **עלות מינימלית:** $7,023.32
 
 ---
+### [2026-02-14] Fund_10_TASE125_Q1_2026 — 5 מניות נוספו, 5 מניות הוסרו
+
+**עדכון מ:** Fund_10_TASE125_Q1_2026 (2026-02-10)
+
+- **+** Elbit Systems Ltd (ESLT.TA) — בסיס, 16%, ציון 46.97
+- **+** Nova Ltd (NVMI.TA) — בסיס, 10%, ציון 39.27
+- **+** MEITAV INVESTMENTS HOUSE R1 RIGHTS (MTAV.TA) — פוטנציאל, 6%, ציון 92.40
+- **+** Harel Insurance Investments & Financial Services Ltd (HARL.TA) — פוטנציאל, 6%, ציון 73.72
+- **+** The Phoenix Holdings Ltd. (PHOE.TA) — פוטנציאל, 4%, ציון 62.42
+- **-** Strauss Group (STRS.TA) — בסיס, 16%
+- **-** Menora Miv Hld (MMHD.TA) — בסיס, 10%
+- **-** Aura Investments Ltd (AURA.TA) — פוטנציאל, 6%
+- **-** El Al Israel Airlines Ltd (ELAL.TA) — פוטנציאל, 6%
+- **-** Ashtrom Group Ltd (ASHG.TA) — פוטנציאל, 4%
+
+**עלות מינימלית:** ₪1,295,376.00
+
+---

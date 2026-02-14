@@ -91,8 +91,6 @@ class Settings:
     # הגדרות קרן
     FUND_QUARTER: Optional[str] = os.getenv("FUND_QUARTER") or None
     FUND_YEAR: Optional[int] = int(os.getenv("FUND_YEAR")) if os.getenv("FUND_YEAR") else None
-    FUND_DATE: Optional[str] = os.getenv("FUND_DATE") or None
-
     # הגדרות כלליות
     USE_CACHE = os.getenv("USE_CACHE", "true").lower() == "true"
     DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"

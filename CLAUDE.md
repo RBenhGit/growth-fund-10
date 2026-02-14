@@ -104,9 +104,10 @@ pip install -r requirements.txt
 │   ├── adapter.py              # Validation & normalization
 │   ├── twelvedata_api.py       # TwelveData (recommended)
 │   ├── yfinance_source.py      # Yahoo Finance (free pricing)
-│   └── alphavantage_api.py     # Alpha Vantage (US only)
+│   ├── alphavantage_api.py     # Alpha Vantage (US only)
+│   └── exceptions.py          # Custom exception classes
 ├── fund_builder/
-│   ├── fund_builder.py         # Full fund construction logic
+│   ├── builder.py              # Full fund construction logic
 │   └── updater.py              # Quarterly LTM-based update
 ├── utils/
 │   ├── date_utils.py           # Date/quarter/folder utilities
@@ -118,7 +119,11 @@ pip install -r requirements.txt
 ├── tests/
 │   ├── test_all_sources.py
 │   ├── test_quarterly_update.py
-│   └── ...
+│   ├── test_current_data.py
+│   ├── test_price_alignment.py
+│   ├── test_symbol_normalization.py
+│   ├── test_tase_api.py
+│   └── verify_index.py
 ├── cache/
 │   ├── stocks_data/        # Stock JSON files (598+ files)
 │   └── index_constituents/ # Index member lists
@@ -150,7 +155,7 @@ The system follows a 14-step process:
    - Momentum: 30%
    - Valuation: 20%
 8. **Select Top 4 Potential Stocks**
-9. **Assign Fixed Weights** - 20%, 16%, 14%, 12%, 10%, 8%, 6%, 5%, 5%, 4%
+9. **Assign Fixed Weights** - 18%, 16%, 16%, 10%, 10%, 10%, 6%, 6%, 4%, 4%
 10. **Calculate Minimum Fund Cost** - Ensure whole share numbers per fund unit
 11. **Generate Fund Table**
 12. **Create Update Document** - With all scoring tables

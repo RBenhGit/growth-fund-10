@@ -31,7 +31,7 @@ Each fund consists of **10 stocks**:
 - **6 Base Stocks**: Established companies with 5+ years of proven profitability
 - **4 Potential Stocks**: High-growth candidates with 2+ years of profitability
 
-**Fixed Weights**: 18%, 16%, 16%, 10%, 10%, 0%, 6%, 6%, 4%, 4%
+**Fixed Weights**: 18%, 16%, 16%, 10%, 10%, 10%, 6%, 6%, 4%, 4%
 
 ## 🚀 Installation
 
@@ -212,14 +212,14 @@ python build_fund.py --index SP500 --quarter Q4 --year 2025
 Then backtest it:
 
 ```bash
-python backtest.py Fund_Docs/Fund_10_SP500_Q4_2025.md --years 10
+python backtest.py Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md --years 10
 ```
 
 ### Backtest Parameters
 
 | Parameter | Description | Default | Example |
 |-----------|-------------|---------|---------|
-| `fund_file` | Path to fund markdown file | *Required* | `Fund_Docs/Fund_10_SP500_Q4_2025.md` |
+| `fund_file` | Path to fund markdown file | *Required* | `Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md` |
 | `--years` | Number of years to backtest | 10 | `5`, `10`, `15` |
 | `--output-dir` | Directory for reports/charts | `Fund_Docs` | `Backtest_Results` |
 
@@ -228,19 +228,19 @@ python backtest.py Fund_Docs/Fund_10_SP500_Q4_2025.md --years 10
 **Standard 10-year backtest:**
 
 ```bash
-python backtest.py Fund_Docs/Fund_10_SP500_Q4_2025.md
+python backtest.py Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md
 ```
 
 **5-year backtest:**
 
 ```bash
-python backtest.py Fund_Docs/Fund_10_SP500_Q4_2025.md --years 5
+python backtest.py Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md --years 5
 ```
 
 **Custom output directory:**
 
 ```bash
-python backtest.py Fund_Docs/Fund_10_TASE125_Q1_2025.md --years 10 --output-dir Backtest_Results
+python backtest.py Fund_Docs/TASE125/Q1_2025/Fund_10_TASE125_Q1_2025.md --years 10 --output-dir Backtest_Results
 ```
 
 ### Backtest Output
@@ -426,7 +426,7 @@ python tests/test_all_sources.py
 python build_fund.py --index SP500
 
 # 5. Review output
-# Open Fund_Docs/Fund_10_SP500_Q4_2025.md
+# Open Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md
 ```
 
 ### Regular Usage

@@ -19,7 +19,11 @@
       "WebFetch(domain:publicapi.dev)",
       "WebFetch(domain:api.twelvedata.com)",
       "Bash(git pull:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release create:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []

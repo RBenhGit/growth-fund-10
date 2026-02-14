@@ -110,7 +110,7 @@ DEBUG_MODE=false
 ### 2. Build Docker Image
 
 ```bash
-docker build -t growth-fund-builder:latest .
+docker build -f deployment/Dockerfile -t growth-fund-builder:latest .
 ```
 
 ### 3. Test Run - SP500
@@ -137,13 +137,13 @@ docker run --rm \
 
 ```bash
 # Test SP500
-docker-compose up growth-fund-builder
+docker-compose -f deployment/docker-compose.yml up growth-fund-builder
 
 # Test TASE125
-docker-compose up growth-fund-builder-tase
+docker-compose -f deployment/docker-compose.yml up growth-fund-builder-tase
 
 # Test data sources
-docker-compose up test-sources
+docker-compose -f deployment/docker-compose.yml up test-sources
 ```
 
 ### Expected Output
@@ -284,7 +284,7 @@ GitHub Actions will automatically:
 ECR_URL=$(terraform output -raw ecr_repository_url)
 
 # Build image
-docker build -t growth-fund-builder:latest .
+docker build -f deployment/Dockerfile -t growth-fund-builder:latest .
 
 # Tag for ECR
 docker tag growth-fund-builder:latest $ECR_URL:latest
@@ -502,7 +502,7 @@ aws events enable-rule --name growth-fund-builder-quarterly-q1
 Or manually:
 ```bash
 # Rebuild image
-docker build -t growth-fund-builder:latest .
+docker build -f deployment/Dockerfile -t growth-fund-builder:latest .
 
 # Push to ECR (see Deployment Process)
 # ...
@@ -555,7 +555,7 @@ aws dynamodb delete-table --table-name growth-fund-terraform-locks
 ## 🆘 Support
 
 For issues or questions:
-1. Check [CLAUDE.md](../../CLAUDE.md) for technical details
+1. Check [CLAUDE.md](../CLAUDE.md) for technical details
 2. Review CloudWatch logs
 3. Enable debug mode for verbose output
 4. Check GitHub Actions workflow logs

@@ -271,11 +271,19 @@ Tests:
 │   └── fund_builder.py        # Fund construction logic
 ├── utils/
 │   └── date_utils.py          # Date/quarter utilities
+├── tests/                     # Test suite
+│   ├── test_all_sources.py
+│   └── ...
+├── docs/                      # Project documentation
+│   ├── Fund_Update_Instructions.md
+│   └── PRODUCTION_READY.md
+├── deployment/                # Docker & AWS deployment
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── DEPLOYMENT.md
+│   └── terraform/             # AWS infrastructure
 ├── cache/                     # Cached data (auto-created)
-│   ├── stocks_data/           # Individual stock data
-│   └── index_constituents/    # Index member lists
 ├── Fund_Docs/                 # Generated fund documents
-├── test_*.py                  # Test scripts
 ├── requirements.txt           # Python dependencies
 ├── .env                       # Configuration (create from template)
 └── README.md                  # This file
@@ -363,7 +371,7 @@ python build_fund.py --index SP500 --no-cache
 ### Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Developer guide for Claude Code
-- **[Fund_Update_Instructions.md](Fund_Update_Instructions.md)** - Detailed fund building process
+- **[Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md)** - Detailed fund building process
 
 ### API Documentation
 

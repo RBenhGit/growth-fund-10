@@ -83,17 +83,32 @@ pip install -r requirements.txt
 │   ├── yfinance_source.py     # Yahoo Finance (free pricing)
 │   └── alphavantage_api.py    # Alpha Vantage (US only)
 ├── tests/                 # Test suite
-│   └── test_all_sources.py
+│   ├── test_all_sources.py
+│   ├── test_current_data.py
+│   ├── test_price_alignment.py
+│   ├── test_symbol_normalization.py
+│   ├── test_tase_api.py
+│   └── verify_index.py
 ├── utils/                 # Helper utilities
 │   └── date_utils.py
 ├── fund_builder/          # Fund construction logic
+├── docs/                  # Project documentation
+│   ├── Fund_Update_Instructions.md
+│   ├── Fund_Update_Instructions_Checklist.md
+│   └── PRODUCTION_READY.md
+├── deployment/            # Docker & AWS deployment
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── .dockerignore
+│   ├── DEPLOYMENT.md
+│   └── terraform/         # AWS infrastructure (Terraform)
 ├── cache/                 # Cached data (stocks, index constituents)
 └── Fund_Docs/             # Generated fund documentation
 ```
 
 ## Fund Building Process
 
-The system follows a 14-step process defined in [Fund_Update_Instructions.md](Fund_Update_Instructions.md):
+The system follows a 14-step process defined in [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md):
 
 1. **Fetch Index Constituents** - Get current stock list from index
 2. **Filter Base Stocks** - Apply strict eligibility criteria (5 years profitability, operating profit, debt/equity < 60%)
@@ -118,9 +133,9 @@ The system follows a 14-step process defined in [Fund_Update_Instructions.md](Fu
 
 ### Scoring System Constants
 
-Defined in [config/settings.py](config/settings.py:46-60):
+Defined in [config/settings.py](config/settings.py:100-115):
 ```python
-FUND_WEIGHTS = [0.20, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.05, 0.05, 0.04]
+FUND_WEIGHTS = [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
 BASE_SCORE_WEIGHTS = {
     "net_income_growth": 0.40,
     "revenue_growth": 0.35,
@@ -259,7 +274,7 @@ If you leave a source blank, the router auto-selects from these chains:
 
 ### Data Source Priority
 
-Per [Fund_Update_Instructions.md](Fund_Update_Instructions.md:19-49):
+Per [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md:19-49):
 - **Primary recommended source**: TwelveData (comprehensive coverage, requires Pro plan)
 - **Official sources for verification**: SEC EDGAR (US), TASE/Maya (Israel)
 - **Backup sources**: Yahoo Finance, Google Finance
@@ -419,7 +434,7 @@ Based on TODO comments in the code:
 
 1. **Fund Builder Implementation** - [build_fund.py](build_fund.py:122-131) has placeholder steps
 2. **Scoring Algorithms** - Implement growth, momentum, and valuation calculations
-3. **LCM Calculation** - [Fund_Update_Instructions.md](Fund_Update_Instructions.md:163) minimum cost calculation
+3. **LCM Calculation** - [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md:163) minimum cost calculation
 
 ## Key Design Patterns
 

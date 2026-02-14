@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-02-10T05:08:09.911013",
+  "timestamp": "2026-02-11T01:20:35.792902",
   "index": "SP500",
   "quarter": "Q1",
   "year": 2026,
   "total_constituents": 503,
-  "loaded": 498,
-  "failed": 3,
+  "loaded": 489,
+  "failed": 12,
   "failures": {
     "not_found": [],
     "api_error": [],
@@ -26,6 +26,52 @@
         "reason": "Invalid financial data (see logs for details)"
       }
     ],
-    "pricing_validation": []
+    "pricing_validation": [
+      {
+        "symbol": "CEG.US",
+        "name": "Constellation Energy Corp",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "GEHC.US",
+        "name": "GE HealthCare Technologies Inc.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "KVUE.US",
+        "name": "Kenvue Inc.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "VLTO.US",
+        "name": "Veralto Corporation",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SOLV.US",
+        "name": "Solventum Corp.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "GEV.US",
+        "name": "GE Vernova LLC",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "EXE.US",
+        "name": "Expand Energy Corporation",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SNDK.US",
+        "name": "Sandisk Corp",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SOLS.US",
+        "name": "Solstice Advanced Materials, Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      }
+    ]
   }
 }

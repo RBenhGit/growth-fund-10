@@ -259,9 +259,9 @@ Set up alarms for:
 
 ## 📚 Documentation Links
 
-- **User Guide**: [README.md](README.md)
-- **Developer Guide**: [CLAUDE.md](CLAUDE.md)
-- **Deployment Guide**: [deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md)
+- **User Guide**: [README.md](../README.md)
+- **Developer Guide**: [CLAUDE.md](../CLAUDE.md)
+- **Deployment Guide**: [DEPLOYMENT.md](../deployment/DEPLOYMENT.md)
 - **Fund Instructions**: [Fund_Update_Instructions.md](Fund_Update_Instructions.md)
 - **GitHub Release**: https://github.com/RBenhGit/growth-fund-10/releases/tag/v1.0.0
 

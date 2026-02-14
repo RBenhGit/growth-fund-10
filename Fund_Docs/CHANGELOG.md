@@ -38,3 +38,17 @@
 
 ---
 
+### [2026-02-14] Fund_10_SP500_Q1_2026 — 3 מניות נוספו, 3 מניות הוסרו
+
+**עדכון מ:** Fund_10_SP500_Q1_2026 (2026-02-11)
+
+- **+** TKO Group Holdings, Inc. (TKO.US) — בסיס, 10%, ציון 21.96
+- **+** Seagate Technology PLC (STX.US) — פוטנציאל, 6%, ציון 51.48
+- **+** Targa Resources Inc (TRGP.US) — פוטנציאל, 4%, ציון 50.15
+- **-** Trade Desk Inc (TTD.US) — בסיס, 10%
+- **-** Coinbase Global Inc (COIN.US) — פוטנציאל, 6%
+- **-** Vistra Energy Corp (VST.US) — פוטנציאל, 4%
+
+**עלות מינימלית:** $7,023.32
+
+---

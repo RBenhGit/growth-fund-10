@@ -31,7 +31,7 @@ Each fund consists of **10 stocks**:
 - **6 Base Stocks**: Established companies with 5+ years of proven profitability
 - **4 Potential Stocks**: High-growth candidates with 2+ years of profitability
 
-**Fixed Weights**: 20%, 16%, 14%, 12%, 10%, 8%, 6%, 5%, 5%, 4%
+**Fixed Weights**: 18%, 16%, 16%, 10%, 10%, 0%, 6%, 6%, 4%, 4%
 
 ## 🚀 Installation
 

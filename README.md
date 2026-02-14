@@ -274,14 +274,6 @@ Tests:
 ├── tests/                     # Test suite
 │   ├── test_all_sources.py
 │   └── ...
-├── docs/                      # Project documentation
-│   ├── Fund_Update_Instructions.md
-│   └── PRODUCTION_READY.md
-├── deployment/                # Docker & AWS deployment
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── DEPLOYMENT.md
-│   └── terraform/             # AWS infrastructure
 ├── cache/                     # Cached data (auto-created)
 ├── Fund_Docs/                 # Generated fund documents
 ├── requirements.txt           # Python dependencies
@@ -371,7 +363,6 @@ python build_fund.py --index SP500 --no-cache
 ### Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Developer guide for Claude Code
-- **[Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md)** - Detailed fund building process
 
 ### API Documentation
 

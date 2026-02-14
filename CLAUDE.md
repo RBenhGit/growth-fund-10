@@ -92,23 +92,13 @@ pip install -r requirements.txt
 ├── utils/                 # Helper utilities
 │   └── date_utils.py
 ├── fund_builder/          # Fund construction logic
-├── docs/                  # Project documentation
-│   ├── Fund_Update_Instructions.md
-│   ├── Fund_Update_Instructions_Checklist.md
-│   └── PRODUCTION_READY.md
-├── deployment/            # Docker & AWS deployment
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── .dockerignore
-│   ├── DEPLOYMENT.md
-│   └── terraform/         # AWS infrastructure (Terraform)
 ├── cache/                 # Cached data (stocks, index constituents)
 └── Fund_Docs/             # Generated fund documentation
 ```
 
 ## Fund Building Process
 
-The system follows a 14-step process defined in [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md):
+The system follows a 14-step process:
 
 1. **Fetch Index Constituents** - Get current stock list from index
 2. **Filter Base Stocks** - Apply strict eligibility criteria (5 years profitability, operating profit, debt/equity < 60%)
@@ -272,14 +262,6 @@ If you leave a source blank, the router auto-selects from these chains:
 
 **Default**: TwelveData is the system default if no configuration is provided.
 
-### Data Source Priority
-
-Per [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md:19-49):
-- **Primary recommended source**: TwelveData (comprehensive coverage, requires Pro plan)
-- **Official sources for verification**: SEC EDGAR (US), TASE/Maya (Israel)
-- **Backup sources**: Yahoo Finance, Google Finance
-- Always document which source was used for each data point
-
 ### Testing Your Configuration
 
 After setting up your `.env` file, test all configured sources:
@@ -427,14 +409,6 @@ DATA_SOURCE=twelvedata  # Current system default
 ```
 
 The system automatically falls back to these legacy settings if the 2x2 matrix is not configured. **Default value is `twelvedata`** if no configuration is provided.
-
-## Future Development Areas
-
-Based on TODO comments in the code:
-
-1. **Fund Builder Implementation** - [build_fund.py](build_fund.py:122-131) has placeholder steps
-2. **Scoring Algorithms** - Implement growth, momentum, and valuation calculations
-3. **LCM Calculation** - [Fund_Update_Instructions.md](docs/Fund_Update_Instructions.md:163) minimum cost calculation
 
 ## Key Design Patterns
 

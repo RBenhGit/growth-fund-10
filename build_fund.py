@@ -150,92 +150,7 @@ def save_stock_to_cache(stock, cache_dir):
         raise
 
 
-def get_base_company_name(stock):
-    """
-    חילוץ שם החברה הבסיסי מתוך שם החברה או סימול
-
-    מסיר סיומות כגון: Class A, Class B, Class C, Inc, Ltd, Corp, וכו'
-    כדי לזהות חברות עם מספר סוגי מניות.
-
-    Args:
-        stock: מניה
-
-    Returns:
-        str: שם בסיסי של החברה
-    """
-    import re
-
-    name = stock.name.upper()
-    symbol = stock.symbol.upper()
-
-    # הסרת סיומות נפוצות מהשם
-    patterns_to_remove = [
-        r'\s+CLASS\s+[ABC]',  # Class A, Class B, Class C
-        r'\s+SERIES\s+[ABC]',  # Series A, Series B, Series C
-        r'\s+INC\.?$',  # Inc, Inc.
-        r'\s+LTD\.?$',  # Ltd, Ltd.
-        r'\s+CORP\.?$',  # Corp, Corp.
-        r'\s+PLC\.?$',  # PLC, PLC.
-        r'\s+LP\.?$',  # LP, LP.
-        r'\s+LLC\.?$',  # LLC, LLC.
-        r'\s+SA\.?$',  # SA, SA.
-        r'\s+AG\.?$',  # AG, AG.
-        r'\s+NV\.?$',  # NV, NV.
-        r'\s+\(.*\)$',  # (Class A), (NYSE), etc.
-    ]
-
-    base_name = name
-    for pattern in patterns_to_remove:
-        base_name = re.sub(pattern, '', base_name)
-
-    base_name = base_name.strip()
-
-    # אם השם הבסיסי ריק, השתמש בסימול (בלי סיומת)
-    if not base_name:
-        base_name = symbol.split('.')[0]
-
-    return base_name
-
-
-def select_stocks_skip_duplicates(ranked_stocks, count):
-    """
-    בחירת מניות תוך דילוג על כפילויות של חברות
-
-    חברות עם מספר סוגי מניות (Class A, Class B, וכו') נחשבות כחברה אחת.
-    אם מספר מניות של אותה חברה ברשימה, נבחר רק את הראשונה שמופיעה (בדירוג הגבוה ביותר).
-
-    דוגמאות לכפילויות שיזוהו:
-    - Alphabet: GOOGL (Class A), GOOG (Class C)
-    - Fox Corp: FOXA (Class A), FOX (Class B)
-    - Berkshire Hathaway: BRK.A (Class A), BRK.B (Class B)
-
-    Args:
-        ranked_stocks: רשימת מניות ממוינות לפי דירוג (גבוה לנמוך)
-        count: מספר מניות לבחור
-
-    Returns:
-        List[Stock]: רשימת מניות נבחרות (ללא כפילויות)
-    """
-    selected = []
-    seen_companies = set()
-
-    for stock in ranked_stocks:
-        # קבל שם בסיסי של החברה
-        base_name = get_base_company_name(stock)
-
-        # אם כבר יש לנו מניה מחברה זו, דלג
-        if base_name in seen_companies:
-            continue
-
-        # הוסף את המניה
-        selected.append(stock)
-        seen_companies.add(base_name)
-
-        # אם הגענו למספר הנדרש, עצור
-        if len(selected) >= count:
-            break
-
-    return selected
+from utils.dedup import get_base_company_name, select_stocks_skip_duplicates  # noqa: F401
 
 
 def write_data_quality_log(
@@ -772,7 +687,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
 
                 log_dir = Path('logs')
                 log_dir.mkdir(exist_ok=True)
-                log_file = log_dir / f'data_failures_{index_name}_Q{quarter}_{year}.json'
+                log_file = log_dir / f'data_failures_{index_name}_{quarter}_{year}.json'
 
                 with open(log_file, 'w', encoding='utf-8') as f:
                     json.dump(failure_log, f, indent=2, ensure_ascii=False)
@@ -855,7 +770,10 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         # ===== שלב 7: חישוב ציון פוטנציאל =====
         task7 = progress.add_task("[cyan]שלב 7: חישוב ציון פוטנציאל...", total=None)
         try:
-            index_pe = financial_source.get_index_pe_ratio(index_name)
+            # Calculate index P/E from actual stock data (same method as quarterly update)
+            pe_values = [s.pe_ratio for s in builder.all_stocks if s.pe_ratio and s.pe_ratio > 0]
+            index_pe = sum(pe_values) / len(pe_values) if pe_values else None
+            logger.info(f"Step 7: Calculated index P/E from {len(pe_values)} stocks: {index_pe}")
             ranked_potential = builder.score_and_rank_potential_stocks(builder.potential_candidates, index_pe)
 
             # עדכון cache עם ציונים

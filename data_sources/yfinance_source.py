@@ -237,18 +237,3 @@ class YFinanceSource(BaseDataSource):
         financial_data = self.get_stock_financials(symbol, years)
         market_data = self.get_stock_market_data(symbol)
         return financial_data, market_data
-
-    def get_index_pe_ratio(self, index_name: str) -> Optional[float]:
-        """
-        שליפת P/E ממוצע של המדד
-
-        yfinance לא מספק נתוני P/E ברמת המדד.
-
-        Args:
-            index_name: שם המדד
-
-        Returns:
-            None: תמיד מחזיר None - לא זמין
-        """
-        logger.warning(f"yfinance doesn't provide P/E for {index_name}")
-        return None

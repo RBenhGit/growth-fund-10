@@ -295,7 +295,7 @@ Tests:
 │   ├── yfinance_source.py     # Yahoo Finance (free pricing)
 │   └── alphavantage_api.py    # Alpha Vantage API (US only)
 ├── fund_builder/
-│   ├── fund_builder.py        # Full fund construction logic
+│   ├── builder.py             # Full fund construction logic
 │   └── updater.py             # Quarterly LTM-based update
 ├── utils/
 │   ├── date_utils.py          # Date/quarter/folder utilities
@@ -468,4 +468,4 @@ Private research project. Not for distribution or commercial use.
 
 **Made with ❤️ for systematic investing**
 
-*Last updated: February 2026*
+*Last updated: April 2026*

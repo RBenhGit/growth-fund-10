@@ -24,7 +24,9 @@
       "Bash(gh release create:*)",
       "Bash(git rm:*)",
       "Bash(git mv:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(mv \"logs/data_failures_SP500_QQ1_2026.json\" \"logs/data_failures_SP500_Q1_2026.json\")",
+      "Bash(mv \"logs/data_failures_TASE125_QQ1_2026.json\" \"logs/data_failures_TASE125_Q1_2026.json\")"
     ],
     "deny": [],
     "ask": []

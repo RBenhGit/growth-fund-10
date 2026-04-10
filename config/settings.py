@@ -121,7 +121,7 @@ class Settings:
 
     # קריטריוני סינון מניות פוטנציאל
     POTENTIAL_ELIGIBILITY = {
-        "min_profitable_years": 2
+        "min_profitable_years": 3
     }
 
     @classmethod

@@ -110,30 +110,30 @@ class Stock(BaseModel):
 
     def check_potential_eligibility(
         self,
-        min_profitable_years: int = 2
+        min_profitable_years: int = 3
     ) -> bool:
         """
         בדיקת כשירות כמניית פוטנציאל
 
         Args:
-            min_profitable_years: מינימום שנות רווחיות (ברירת מחדל: 2)
+            min_profitable_years: מינימום שנות רווחיות (ברירת מחדל: 3)
 
         Returns:
             bool: True אם המניה כשירה
 
         Note:
             has_profitable_years בודקת את השנים האחרונות ביותר (most recent),
-            ולא רק שיש 2 שנים כלשהן עם רווח.
+            ולא רק שיש 3 שנים כלשהן עם רווח.
         """
         if not self.financial_data:
             return False
 
-        # רווחיות בסיסית - רווח חיובי ב-2 השנים האחרונות
+        # רווחיות בסיסית - רווח חיובי ב-3 השנים האחרונות
         if not self.financial_data.has_profitable_years(min_profitable_years):
             return False
 
-        # יש נתוני צמיחה מלאים
-        if len(self.financial_data.revenues) < 2 or len(self.financial_data.net_incomes) < 2:
+        # יש נתוני צמיחה מלאים ל-3 שנים (נדרש לחישוב CAGR של 2 שנים)
+        if len(self.financial_data.revenues) < 3 or len(self.financial_data.net_incomes) < 3:
             return False
 
         self.is_eligible_for_potential = True

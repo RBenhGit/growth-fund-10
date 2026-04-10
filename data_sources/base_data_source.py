@@ -73,19 +73,6 @@ class BaseDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_index_pe_ratio(self, index_name: str) -> Optional[float]:
-        """
-        שליפת P/E ממוצע של המדד
-
-        Args:
-            index_name: שם המדד
-
-        Returns:
-            Optional[float]: P/E ממוצע או None
-        """
-        pass
-
-    @abstractmethod
     def get_stock_data(self, symbol: str, years: int = 5) -> tuple['FinancialData', 'MarketData']:
         """
         שליפת כל נתוני המניה - פיננסיים ושוק

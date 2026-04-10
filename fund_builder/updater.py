@@ -203,7 +203,7 @@ class QuarterlyUpdater:
         index_pe = sum(pe_values) / len(pe_values) if pe_values else None
 
         # Remove base-selected stocks from potential pool
-        from build_fund import select_stocks_skip_duplicates
+        from utils.dedup import select_stocks_skip_duplicates
         selected_base = select_stocks_skip_duplicates(ranked_base, 6)
         selected_base_symbols = {s.symbol for s in selected_base}
 

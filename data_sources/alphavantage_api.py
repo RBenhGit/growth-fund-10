@@ -353,20 +353,6 @@ class AlphaVantageSource(BaseDataSource):
         except (KeyError, ValueError) as e:
             raise RuntimeError(f"שגיאה בעיבוד נתוני שוק עבור {symbol}: {e}")
 
-    def get_index_pe_ratio(self, index_name: str) -> Optional[float]:
-        """
-        שליפת P/E ממוצע של המדד
-
-        Args:
-            index_name: שם המדד
-
-        Returns:
-            Optional[float]: P/E ממוצע או None (לא זמין ב-Alpha Vantage)
-        """
-        # Alpha Vantage doesn't provide index-level P/E
-        logger.warning("P/E ממוצע של המדד לא זמין ב-Alpha Vantage API")
-        return None
-
     def get_stock_data(self, symbol: str, years: int = 5) -> tuple[FinancialData, MarketData]:
         """
         שליפת כל נתוני המניה - מתודה מאוחדת

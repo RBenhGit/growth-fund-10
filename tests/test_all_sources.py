@@ -63,7 +63,6 @@ def test_source(source_class, source_name: str, test_symbol: str, index_name: st
         "get_stock_data": False,
         "get_financials": False,
         "get_market": False,
-        "get_index_pe": False,
         "data_valid": False,
         "error": None
     }
@@ -131,19 +130,6 @@ def test_source(source_class, source_name: str, test_symbol: str, index_name: st
             console.print(f"[green]✓ get_stock_market_data() עובד[/green]")
         except Exception as e:
             console.print(f"[red]❌ שגיאה ב-get_stock_market_data(): {e}[/red]")
-
-        # Test 6: Get index P/E ratio
-        try:
-            pe = source.get_index_pe_ratio(index_name)
-            results["get_index_pe"] = True
-            if pe:
-                console.print(f"[green]✓ P/E של מדד: {pe:.2f}[/green]")
-            else:
-                console.print(f"[yellow]⚠ P/E של מדד לא זמין[/yellow]")
-        except NotImplementedError:
-            console.print(f"[yellow]⚠ get_index_pe_ratio לא מומש[/yellow]")
-        except Exception as e:
-            console.print(f"[red]❌ שגיאה בשליפת P/E: {e}[/red]")
 
         source.logout()
         return results

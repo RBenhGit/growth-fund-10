@@ -1,38 +1,37 @@
 # השוואה רבעונית — Fund_10_SP500_Q1_2026
 
-עדכון מ: Fund_10_SP500_Q1_2026 (2026-02-11)
-עדכון ל: Fund_10_SP500_Q1_2026 (2026-02-14)
+עדכון מ: Fund_10_SP500_Q1_2026 (2026-02-16)
+עדכון ל: Fund_10_SP500_Q1_2026 (2026-02-16)
 
 ## סיכום שינויים
 
-- מניות שנוספו: 3
-- מניות שהוסרו: 3
-- מניות שנשארו: 7
+- מניות שנוספו: 2
+- מניות שהוסרו: 2
+- מניות שנשארו: 8
 
 ## מניות חדשות
 
 | סימול | שם | סוג | משקל | ציון |
 |-------|-----|-----|------|------|
-| TKO.US | TKO Group Holdings, Inc. | בסיס | 10.0% | 21.96 |
-| STX.US | Seagate Technology PLC | פוטנציאל | 6.0% | 51.48 |
-| TRGP.US | Targa Resources Inc | פוטנציאל | 4.0% | 50.15 |
+| TKO.US | TKO Group Holdings, Inc. | בסיס | 10.0% | 20.91 |
+| EQT.US | EQT Corporation | פוטנציאל | 6.0% | 49.45 |
 
 ## מניות שהוסרו
 
 | סימול | שם | סוג | משקל קודם | ציון קודם |
 |-------|-----|-----|-----------|----------|
 | TTD.US | Trade Desk Inc | בסיס | 10.0% | 31.72 |
-| COIN.US | Coinbase Global Inc | פוטנציאל | 6.0% | 71.18 |
-| VST.US | Vistra Energy Corp | פוטנציאל | 4.0% | 50.76 |
+| INCY.US | Incyte Corporation | פוטנציאל | 6.0% | 73.43 |
 
 ## מניות שנשארו
 
 | סימול | שם | משקל קודם | משקל חדש | ציון קודם | ציון חדש | שינוי |
 |-------|-----|-----------|----------|-----------|---------|-------|
-| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 89.69 | 91.07 | → |
-| CRM.US | Salesforce.com Inc | 16.0% | 16.0% | 49.79 | 45.29 | → |
-| GOOG.US | Alphabet Inc Class C | 16.0% | 16.0% | 39.97 | 29.26 | → |
-| MSFT.US | Microsoft Corporation | 10.0% | 10.0% | 34.76 | 25.92 | → |
-| AMD.US | Advanced Micro Devices Inc | 10.0% | 10.0% | 29.88 | 19.42 | → |
-| MU.US | Micron Technology Inc | 6.0% | 6.0% | 55.57 | 84.47 | → |
-| SMCI.US | Super Micro Computer Inc | 4.0% | 4.0% | 51.20 | 47.13 | → |
+| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 89.69 | 90.78 | → |
+| CRM.US | Salesforce.com Inc | 16.0% | 16.0% | 49.80 | 45.29 | → |
+| GOOG.US | Alphabet Inc Class C | 16.0% | 16.0% | 39.78 | 28.08 | → |
+| MSFT.US | Microsoft Corporation | 10.0% | 10.0% | 34.79 | 24.72 | → |
+| AMD.US | Advanced Micro Devices Inc | 10.0% | 10.0% | 29.88 | 18.48 | → |
+| VST.US | Vistra Energy Corp | 6.0% | 4.0% | 50.86 | 44.94 | ↓ |
+| MU.US | Micron Technology Inc | 4.0% | 6.0% | 50.44 | 75.44 | ↑ |
+| TRGP.US | Targa Resources Inc | 4.0% | 4.0% | 49.69 | 49.12 | → |

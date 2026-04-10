@@ -88,8 +88,8 @@ DataSourceRouter.get_pricing_source("TASE125")
 ### Step 3: Score & Rank Base Stocks
 - **Input:** 2 base-eligible stocks
 - **Calculations per stock:**
-  - Net income CAGR (3-year): `((NI_recent / NI_3yrs_ago) ^ (1/2) - 1) * 100`
-  - Revenue CAGR (3-year): same formula with revenues
+  - Net income CAGR (4-year): `((NI_recent / NI_4yrs_ago) ^ (1/4) - 1) * 100` (5 data points, `years=5`)
+  - Revenue CAGR (4-year): same formula with revenues
   - Market cap: raw value
 - **Normalization:** Min-max scaling to 0-100 across the cohort
 - **Weighted score:** `NI_growth * 0.40 + Rev_growth * 0.35 + Market_cap * 0.25`
@@ -103,7 +103,7 @@ DataSourceRouter.get_pricing_source("TASE125")
 
 ### Step 4: Select Top 6 Base Stocks
 - **Input:** 2 ranked base stocks
-- **Processing:** `select_stocks_skip_duplicates(ranked_base, 6)` — selects up to 6 unique companies
+- **Processing:** `utils.dedup.select_stocks_skip_duplicates(ranked_base, 6)` — selects up to 6 unique companies
 - **Output:** Only 2 stocks selected (insufficient candidates)
 - **BUG:** The system proceeds without raising an error when fewer than 6 base stocks are found. This leads to a broken fund composition downstream.
 - **Transition to Step 5:** `builder.selected_base = [CRSO.TA, MGIC.TA]`
@@ -116,7 +116,7 @@ DataSourceRouter.get_pricing_source("TASE125")
 
 ### Step 6: Filter Potential Stocks
 - **Input:** 115 stocks from pool
-- **Processing:** `stock.check_potential_eligibility()` — 2 years positive net income + 2 years revenue/income data
+- **Processing:** `stock.check_potential_eligibility()` — 3 years positive net income + 3 years revenue/income data
 - **Output:** 92 eligible potential stocks (out of 94 total eligible minus 2 used as base)
 - **Transition to Step 7:** `builder.potential_candidates = [92 stocks]`
 
@@ -125,7 +125,7 @@ DataSourceRouter.get_pricing_source("TASE125")
 - **Index P/E:** `financial_source.get_index_pe_ratio("TASE125")` — **returns None** for TASE125 (only implemented for SP500 in `eodhd_api.py:390-413`)
 - **BUG in working copy (line 499):** References `data_source.get_index_pe_ratio()` but variable is named `financial_source` — causes `NameError` on fresh runs
 - **Calculations per stock:**
-  - Future growth: 2-year net income CAGR
+  - Future growth: 2-year net income CAGR (3 data points, `years=3`)
   - Momentum: `((current_price - oldest_price) / oldest_price) * 100` — **defaults to 0.0 for 88 stocks without price**
   - Valuation: `(2 - stock_pe/index_pe) * 50` — **defaults to 0.0 for all stocks** because `index_pe = None`
 - **Normalization:** Min-max to 0-100, then weighted: `growth * 0.50 + momentum * 0.30 + valuation * 0.20`
@@ -137,7 +137,7 @@ DataSourceRouter.get_pricing_source("TASE125")
 
 ### Step 8: Select Top 4 Potential Stocks
 - **Input:** 92 ranked potential stocks
-- **Processing:** `select_stocks_skip_duplicates(ranked_potential, 4)`
+- **Processing:** `utils.dedup.select_stocks_skip_duplicates(ranked_potential, 4)`
 - **Output:** 4 stocks: DUNI.TA, ENLT.TA, CAMT.TA, NVMI.TA
 - **Transition to Step 9:** `builder.selected_potential = [4 stocks]`
 
@@ -254,14 +254,17 @@ Major Israeli companies missing price data due to the yfinance symbol issue:
 
 ### 5.1 Base Stock Scoring
 
+> **Note:** The numerical examples below were computed with the old `years=3` (2-year CAGR) parameter.
+> Current code uses `years=5` (4-year CAGR). Formula structure is identical; only the look-back window differs.
+
 **Formula:** Weighted composite of 3 normalized metrics
 
 ```
 Step 1: Raw metric calculation
-  net_income_growth = CAGR(net_incomes, 3 years)
-    CAGR = ((NI_year0 / NI_year2) ^ (1/2) - 1) * 100
+  net_income_growth = CAGR(net_incomes, 5 years)   # years=5 → 4-year CAGR
+    CAGR = ((NI_year0 / NI_year4) ^ (1/4) - 1) * 100
 
-  revenue_growth = CAGR(revenues, 3 years)
+  revenue_growth = CAGR(revenues, 5 years)          # years=5 → 4-year CAGR
     Same formula
 
   market_cap = raw market cap value (no transformation)
@@ -308,7 +311,7 @@ Score = 0*0.40 + 0*0.35 + 100*0.25 = 25.00
 
 ```
 Step 1: Raw metric calculation
-  future_growth = CAGR(net_incomes, 2 years)
+  future_growth = CAGR(net_incomes, 3 years)   # years=3 → 2-year CAGR
 
   momentum = ((current_price - oldest_price) / oldest_price) * 100
     Uses price_history dict, oldest vs current
@@ -397,8 +400,9 @@ EODHD's `ebitda` field is used as operating income. For many TASE companies (esp
 **Impact:** Only 2 stocks pass base eligibility instead of an expected 30-50+.
 
 ### 6.3 CRITICAL: No Minimum Stock Count Enforcement
-**File:** `build_fund.py:464`
+**File:** `build_fund.py` (delegates to `utils/dedup.py`)
 ```python
+from utils.dedup import select_stocks_skip_duplicates
 builder.selected_base = select_stocks_skip_duplicates(ranked_base, 6)
 ```
 No check that 6 stocks were actually found. The system continues with fewer stocks, producing a broken fund (80% weight, 6/10 positions, wrong position types).

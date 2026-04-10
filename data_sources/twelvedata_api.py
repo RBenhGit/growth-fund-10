@@ -865,35 +865,3 @@ class TwelveDataSource(BaseDataSource):
             pe_ratio=pe_ratio,
             price_history=price_history
         )
-
-    def get_index_pe_ratio(self, index_name: str) -> Optional[float]:
-        """
-        חישוב P/E ממוצע של המדד
-
-        Twelve Data אינו מספק P/E ישירות למדדים ישראליים.
-        נחשב ממוצע משוקלל מנתוני המניות.
-
-        Args:
-            index_name: שם המדד
-
-        Returns:
-            Optional[float]: P/E ממוצע או None
-        """
-        # For SP500 try index statistics
-        if index_name == "SP500":
-            try:
-                data = self._api_request("/statistics", {"symbol": "SPX"})
-                stats = data.get("statistics", {})
-                pe = stats.get("valuations_metrics", {}).get("trailing_pe")
-                if pe:
-                    return float(pe)
-            except Exception:
-                pass
-
-        # Default: return a reasonable estimate
-        # TA-125 historical P/E typically ranges 10-18
-        if index_name == "TASE125":
-            logger.info("Using estimated TASE125 P/E ratio of 14.0")
-            return 14.0
-
-        return None

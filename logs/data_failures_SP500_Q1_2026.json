@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-02-11T01:20:35.792902",
+  "timestamp": "2026-03-23T13:28:15.504662",
   "index": "SP500",
   "quarter": "Q1",
   "year": 2026,
   "total_constituents": 503,
-  "loaded": 489,
-  "failed": 12,
+  "loaded": 487,
+  "failed": 13,
   "failures": {
     "not_found": [],
     "api_error": [],
@@ -14,19 +14,14 @@
         "symbol": "PSKY.US",
         "name": "Paramount Skydance Corporation Class B Common Stock",
         "reason": "Invalid financial data (see logs for details)"
-      },
-      {
-        "symbol": "Q.US",
-        "name": "Qnity Electronics, Inc",
-        "reason": "Invalid financial data (see logs for details)"
-      },
-      {
-        "symbol": "FISV.US",
-        "name": "Fiserv, Inc. Common Stock",
-        "reason": "Invalid financial data (see logs for details)"
       }
     ],
     "pricing_validation": [
+      {
+        "symbol": "MMC.US",
+        "name": "Marsh & McLennan Companies Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
       {
         "symbol": "CEG.US",
         "name": "Constellation Energy Corp",
@@ -70,6 +65,16 @@
       {
         "symbol": "SOLS.US",
         "name": "Solstice Advanced Materials, Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "Q.US",
+        "name": "Qnity Electronics, Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "FISV.US",
+        "name": "Fiserv, Inc. Common Stock",
         "reason": "Invalid pricing data (see logs for details)"
       }
     ]

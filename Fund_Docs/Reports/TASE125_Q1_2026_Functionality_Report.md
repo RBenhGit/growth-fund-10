@@ -99,13 +99,13 @@ check_base_eligibility(min_profitable_years=5, min_operating_profit_years=4, max
 
 #### בדיקת כשירות פוטנציאל (Potential Eligibility) — 2 קריטריונים:
 ```
-check_potential_eligibility(min_profitable_years=2)
+check_potential_eligibility(min_profitable_years=3)
 ```
 
 | # | קריטריון | בדיקה |
 |---|----------|--------|
-| 1 | רווחיות בסיסית | 2 השנים האחרונות עם רווח נקי חיובי |
-| 2 | נתוני צמיחה | לפחות 2 שנים של `revenues` ו-`net_incomes` |
+| 1 | רווחיות בסיסית | 3 השנים האחרונות עם רווח נקי חיובי |
+| 2 | נתוני צמיחה | לפחות 3 שנים של `revenues` ו-`net_incomes` (נדרש לחישוב CAGR של 2 שנים) |
 
 ### שלב 3: חישוב וציון מניות הבסיס
 | | פירוט |
@@ -113,8 +113,8 @@ check_potential_eligibility(min_profitable_years=2)
 | **קלט** | 33 `base_candidates` מ-Step 2 |
 | **עיבוד** | `builder.score_and_rank_base_stocks(base_candidates)` |
 | | 1. **לכל מניה** - חישוב ציוני גלם (raw scores): |
-| | - `net_income_growth`: CAGR של רווח נקי על 3 שנים |
-| | - `revenue_growth`: CAGR של הכנסות על 3 שנים |
+| | - `net_income_growth`: CAGR של רווח נקי על 5 שנים (4-year CAGR) |
+| | - `revenue_growth`: CAGR של הכנסות על 5 שנים (4-year CAGR) |
 | | - `market_cap`: שווי שוק כערך גולמי |
 | | 2. **נרמול** (Normalization): כל שלושת הרכיבים מנורמלים לטווח 0-100 |
 | | 3. **חישוב ציון סופי** (Weighted Composite): |
@@ -125,6 +125,8 @@ check_potential_eligibility(min_profitable_years=2)
 #### חישוב CAGR (Compound Annual Growth Rate)
 ```python
 calculate_growth_rate(values: Dict[int, float], years: int = 3)
+# Base stocks: called with years=5 → 4-year CAGR
+# Potential stocks: called with years=3 → 2-year CAGR
 ```
 - מיון שנים בסדר יורד
 - `start_value = values[oldest_year]`, `end_value = values[newest_year]`
@@ -141,8 +143,8 @@ normalize_score(values: List[float])
 #### דוגמת חישוב — NXSN.TA (דירוג #1, ציון 80.25):
 | רכיב | ציון גלם | ציון מנורמל | משקל | תרומה |
 |-------|----------|------------|------|--------|
-| net_income_growth (CAGR 3Y) | (ערך גולמי) | (0-100) | 0.40 | ~32.1 |
-| revenue_growth (CAGR 3Y) | (ערך גולמי) | (0-100) | 0.35 | ~28.1 |
+| net_income_growth (CAGR 4Y) | (ערך גולמי) | (0-100) | 0.40 | ~32.1 |
+| revenue_growth (CAGR 4Y) | (ערך גולמי) | (0-100) | 0.35 | ~28.1 |
 | market_cap | (ערך גולמי) | (0-100) | 0.25 | ~20.1 |
 | **סה"כ** | | | **1.00** | **80.25** |
 
@@ -150,9 +152,9 @@ normalize_score(values: List[float])
 | | פירוט |
 |---|--------|
 | **קלט** | 33 `ranked_base` (ממוינות לפי base_score, יורד) |
-| **עיבוד** | `select_stocks_skip_duplicates(ranked_base, 6)` |
-| | - מזהה כפילויות חברות (Class A/B/C, סיומות שונות) |
-| | - `get_base_company_name()`: מסיר סיומות Inc, Ltd, Corp, Class A/B/C |
+| **עיבוד** | `utils.dedup.select_stocks_skip_duplicates(ranked_base, 6)` |
+| | - מזהה כפילויות חברות (Class A/B/C, סיומות שונות, סיומת אות בודדת כגון "News Corp A") |
+| | - `utils.dedup.get_base_company_name()`: מסיר סיומות Inc, Ltd, Corp, Class A/B/C, וסיומת אות בודדת |
 | | - בוחר את 6 הראשונות ללא כפילויות |
 | **פלט** | 6 מניות נבחרות: |
 
@@ -181,10 +183,10 @@ normalize_score(values: List[float])
 |---|--------|
 | **קלט** | 104 מניות מ-`potential_pool` |
 | **עיבוד** | `stock.check_potential_eligibility()` לכל מניה |
-| | - 2 שנים רצופות של רווח נקי חיובי |
-| | - לפחות 2 ערכים ב-`revenues` ו-`net_incomes` |
+| | - 3 שנים רצופות של רווח נקי חיובי |
+| | - לפחות 3 ערכים ב-`revenues` ו-`net_incomes` |
 | **פלט** | 84 מניות כשירות (`potential_eligible`) |
-| **20 מניות שנפלו** | מניות עם הפסדים ב-2 השנים האחרונות או חוסר בנתונים |
+| **20 מניות שנפלו** | מניות עם הפסדים ב-3 השנים האחרונות או חוסר בנתונים |
 | **מעבר לשלב 7** | 84 מניות עוברות לציון פוטנציאל |
 
 ### שלב 7: חישוב ציון פוטנציאל
@@ -198,9 +200,9 @@ normalize_score(values: List[float])
 
 **1. צמיחה עתידית (Future Growth) — משקל 50%**
 ```python
-future_growth = calculate_growth_rate(net_incomes, years=2)  # CAGR 2 שנים
+future_growth = calculate_growth_rate(net_incomes, years=3)  # CAGR 2 שנים (3 נקודות נתונים)
 ```
-- CAGR על 2 שנים אחרונות של רווח נקי
+- CAGR של 2 שנים (3 נקודות נתונים) של רווח נקי — מונע עיוות מאירועים חד-פעמיים
 - אם אין מספיק נתונים → 0.0
 
 **2. מומנטום (Momentum) — משקל 30%**
@@ -233,7 +235,7 @@ potential_score = growth_norm × 0.50 + momentum_norm × 0.30 + valuation_norm �
 | | פירוט |
 |---|--------|
 | **קלט** | 84 `ranked_potential` |
-| **עיבוד** | `select_stocks_skip_duplicates(ranked_potential, 4)` |
+| **עיבוד** | `utils.dedup.select_stocks_skip_duplicates(ranked_potential, 4)` |
 | **פלט** | 4 מניות נבחרות: |
 
 | דירוג | מניה | ציון |

@@ -100,13 +100,13 @@ class FundBuilder:
         if not stock.financial_data:
             return 0.0
 
-        # צמיחת רווח נקי
-        net_income_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 3)
+        # צמיחת רווח נקי (5 נקודות נתונים → CAGR של 4 שנים)
+        net_income_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 5)
         if net_income_growth is None:
             net_income_growth = 0.0
 
-        # צמיחת הכנסות
-        revenue_growth = self.calculate_growth_rate(stock.financial_data.revenues, 3)
+        # צמיחת הכנסות (5 נקודות נתונים → CAGR של 4 שנים)
+        revenue_growth = self.calculate_growth_rate(stock.financial_data.revenues, 5)
         if revenue_growth is None:
             revenue_growth = 0.0
 
@@ -138,8 +138,8 @@ class FundBuilder:
         if not stock.financial_data or not stock.market_data:
             return {"future_growth": 0.0, "momentum": 0.0, "valuation": 0.0}
 
-        # צמיחה עתידית (מבוסס על צמיחה ב-2 שנים אחרונות)
-        future_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 2) or 0.0
+        # צמיחה עתידית (3 נקודות נתונים → CAGR של 2 שנים, מונע עיוות מאירועים חד-פעמיים)
+        future_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 3) or 0.0
 
         # מומנטום (שינוי מחיר בשנה האחרונה)
         momentum_raw = stock.market_data.calculate_momentum(365)

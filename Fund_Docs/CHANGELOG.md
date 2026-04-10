@@ -70,3 +70,49 @@
 **עלות מינימלית:** ₪1,295,376.00
 
 ---
+### [2026-02-16] Fund_10_TASE125_Q1_2026 — 4 מניות נוספו, 4 מניות הוסרו
+
+**עדכון מ:** Fund_10_TASE125_Q1_2026 (2026-02-16)
+
+- **+** Elbit Systems Ltd (ESLT.TA) — בסיס, 16%, ציון 46.97
+- **+** MEITAV INVESTMENTS HOUSE R1 RIGHTS (MTAV.TA) — פוטנציאל, 6%, ציון 92.40
+- **+** Harel Insurance Investments & Financial Services Ltd (HARL.TA) — פוטנציאל, 6%, ציון 73.72
+- **+** The Phoenix Holdings Ltd. (PHOE.TA) — פוטנציאל, 4%, ציון 62.42
+- **-** Strauss Group (STRS.TA) — בסיס, 16%
+- **-** Aura Investments Ltd (AURA.TA) — פוטנציאל, 6%
+- **-** El Al Israel Airlines Ltd (ELAL.TA) — פוטנציאל, 6%
+- **-** Ashtrom Group Ltd (ASHG.TA) — פוטנציאל, 4%
+
+**עלות מינימלית:** ₪1,304,596.00
+
+---
+### [2026-02-16] Fund_10_SP500_Q1_2026 — 2 מניות נוספו, 2 מניות הוסרו
+
+**עדכון מ:** Fund_10_SP500_Q1_2026 (2026-02-16)
+
+- **+** TKO Group Holdings, Inc. (TKO.US) — בסיס, 10%, ציון 20.91
+- **+** EQT Corporation (EQT.US) — פוטנציאל, 6%, ציון 49.45
+- **-** Trade Desk Inc (TTD.US) — בסיס, 10%
+- **-** Incyte Corporation (INCY.US) — פוטנציאל, 6%
+
+**עלות מינימלית:** $7,076.14
+
+---
+### [2026-04-10] Fund_10_SP500_Q2_2026 — 5 מניות נוספו, 5 מניות הוסרו
+
+**עדכון מ:** Fund_10_SP500_Q1_2026 (2026-03-23)
+
+- **+** News Corp B (NWS.US) — בסיס, 10%, ציון 40.03
+- **+** News Corp A (NWSA.US) — בסיס, 10%, ציון 40.03
+- **+** Seagate Technology PLC (STX.US) — פוטנציאל, 6%, ציון 56.24
+- **+** EQT Corporation (EQT.US) — פוטנציאל, 4%, ציון 50.19
+- **+** Super Micro Computer Inc (SMCI.US) — פוטנציאל, 4%, ציון 48.73
+- **-** Alphabet Inc Class A (GOOGL.US) — בסיס, 16%
+- **-** Microsoft Corporation (MSFT.US) — בסיס, 10%
+- **-** Incyte Corporation (INCY.US) — פוטנציאל, 6%
+- **-** Micron Technology Inc (MU.US) — פוטנציאל, 6%
+- **-** Palantir Technologies Inc. (PLTR.US) — פוטנציאל, 4%
+
+**עלות מינימלית:** $8,393.95
+
+---

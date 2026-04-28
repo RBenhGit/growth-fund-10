@@ -116,3 +116,41 @@
 **עלות מינימלית:** $8,393.95
 
 ---
+### [2026-04-11] Fund_10_SP500_Q2_2026 — 3 מניות נוספו, 3 מניות הוסרו
+
+**עדכון מ:** Fund_10_SP500_Q2_2026 (2026-04-11)
+
+- **+** Booking Holdings Inc (BKNG.US) — בסיס, 10%, ציון 31.34
+- **+** Broadcom Inc (AVGO.US) — פוטנציאל, 6%, ציון 54.97
+- **+** Super Micro Computer Inc (SMCI.US) — פוטנציאל, 4%, ציון 51.76
+- **-** Alphabet Inc Class A (GOOGL.US) — בסיס, 16%
+- **-** Microsoft Corporation (MSFT.US) — בסיס, 10%
+- **-** Palantir Technologies Inc. (PLTR.US) — פוטנציאל, 6%
+
+**עלות מינימלית:** $10,054.29
+
+---
+### [2026-04-11] Fund_10_SP500_Q2_2026 — 3 מניות נוספו, 3 מניות הוסרו
+
+**עדכון מ:** Fund_10_SP500_Q2_2026 (2026-04-11)
+
+- **+** Booking Holdings Inc (BKNG.US) — בסיס, 10%, ציון 31.34
+- **+** Super Micro Computer Inc (SMCI.US) — פוטנציאל, 4%, ציון 50.67
+- **+** Broadcom Inc (AVGO.US) — פוטנציאל, 4%, ציון 48.16
+- **-** Alphabet Inc Class A (GOOGL.US) — בסיס, 16%
+- **-** Microsoft Corporation (MSFT.US) — בסיס, 10%
+- **-** Palantir Technologies Inc. (PLTR.US) — פוטנציאל, 6%
+
+**עלות מינימלית:** $6,665.98
+
+---
+### [2026-04-11] Fund_10_TASE125_Q2_2026 — 1 מניות נוספו, 1 מניות הוסרו
+
+**עדכון מ:** Fund_10_TASE125_Q2_2026 (2026-04-11)
+
+- **+** Turpaz Industries Ltd (TRPZ.TA) — בסיס, 10%, ציון 28.45
+- **-** Tower Semiconductor Ltd (TSEM.TA) — בסיס, 10%
+
+**עלות מינימלית:** ₪1,727,162.00
+
+---

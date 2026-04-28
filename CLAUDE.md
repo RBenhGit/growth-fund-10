@@ -116,6 +116,7 @@ pip install -r requirements.txt
 │   ├── cache_loader.py         # Load Stock objects from cache
 │   ├── ltm_calculator.py       # LTM calculation & merging
 │   ├── changelog.py            # CHANGELOG.md management
+│   ├── dedup.py                # Company deduplication: skip multi-class shares
 │   └── migrate_fund_docs.py    # One-time folder migration
 ├── tests/
 │   ├── test_all_sources.py
@@ -150,17 +151,17 @@ The system follows a 14-step process:
 
 1. **Fetch Index Constituents** - Get current stock list from index
 2. **Filter Base Stocks** - Apply strict eligibility criteria (5 years profitability, operating profit, debt/equity < 60%)
-3. **Score Base Candidates** - Calculate scores based on:
-   - Net income growth: 40%
-   - Revenue growth: 35%
-   - Market cap: 25%
+3. **Score Base Candidates** - Calculate 4-year CAGR over 5 data points for net income and revenue; compute R² stability; blend per axis (70% CAGR + 30% R²); final score:
+   - NI blended: 40%
+   - Revenue blended: 35%
+   - Market cap (rank-percentile): 25%
 4. **Select Top 6 Base Stocks** - Highest scoring stocks become the core portfolio
 5. **Prepare Potential List** - Remove base stocks from index constituents
 6. **Filter Potential Stocks** - Relaxed criteria (3 years profitability)
-7. **Score Potential Candidates** - Different scoring model:
-   - Future growth potential: 50%
-   - Momentum: 30%
-   - Valuation: 20%
+7. **Score Potential Candidates** - Growth-focused model (no stability blend):
+   - Future growth potential: 70%
+   - Momentum: 20%
+   - Valuation: 10%
 8. **Select Top 4 Potential Stocks**
 9. **Assign Fixed Weights** - 18%, 16%, 16%, 10%, 10%, 10%, 6%, 6%, 4%, 4%
 10. **Calculate Minimum Fund Cost** - Ensure whole share numbers per fund unit
@@ -208,19 +209,63 @@ Fund_Docs/{INDEX}/{Q}_{YEAR}/
 
 ### Scoring System Constants
 
-Defined in [config/settings.py](config/settings.py:100-115):
+Defined in [config/settings.py](config/settings.py:99-124):
 ```python
 FUND_WEIGHTS = [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
+BASE_GROWTH_YEARS = 5                        # CAGR over 4 periods (5 data points)
 BASE_SCORE_WEIGHTS = {
     "net_income_growth": 0.40,
     "revenue_growth": 0.35,
     "market_cap": 0.25
 }
+STABILITY_BLEND = 0.30                      # Weight of R² in blended sub-score
 POTENTIAL_SCORE_WEIGHTS = {
-    "future_growth": 0.50,
-    "momentum": 0.30,
-    "valuation": 0.20
+    "future_growth": 0.70,                  # growth-first: 70%
+    "momentum": 0.20,
+    "valuation": 0.10
 }
+```
+
+### Scoring Formulas
+
+**CAGR (4-period compound annual growth rate, 5 data points):**
+```
+CAGR = (end_value / start_value) ^ (1 / (years - 1)) − 1
+```
+With `years = 5`, this always produces a **4-year CAGR** using 5 data points (period = 4).
+The formula is explicit and independent of calendar year gaps, ensuring consistent annualization even after LTM merging adds non-consecutive years.
+Returns `None` when `start_value ≤ 0` or fewer than 5 data points.
+
+**Growth Stability (R² of log-linear regression):**
+```
+Fit: log(value) ~ year_index  over the 5 most-recent data points
+R² = 1.0  →  perfect steady compounder
+R² ≈ 0    →  chaotic / boom-bust path
+```
+Measures how consistently a company compounds: a steady 10% annual grower scores high (R²≈0.99), while a company with volatile earnings scores lower.
+Returns `None` when fewer than 2 positive values (coerced to 0.0 in scoring).
+
+**Rank-percentile normalization (replaces min-max):**
+```
+1. Sort candidates by metric value.
+2. Assign rank 0 (lowest) … n−1 (highest); tied values share the average rank.
+3. percentile = rank / (n − 1) × 100
+```
+Boundary behavior: lowest → 0.0, highest → 100.0, all-equal → 50.0.
+
+**Base stock final score (blended growth-stability per axis):**
+```
+NI_blended  = 0.70 × NI_CAGR_percentile  + 0.30 × NI_R²_percentile
+Rev_blended = 0.70 × Rev_CAGR_percentile + 0.30 × Rev_R²_percentile
+base_score  = 0.40 × NI_blended + 0.35 × Rev_blended + 0.25 × MarketCap_percentile
+```
+The 30% R² weight ensures **long-term consistent compounders are preferred**: two stocks with identical CAGR but different volatility patterns will score differently (steady grower scores higher). This penalizes boom-bust patterns and rewards steady geometric growth.
+
+**Potential stock final score (growth-maximizing, no stability blend):**
+```
+potential_score = 0.70 × FutureGrowth_percentile
+               + 0.20 × Momentum_percentile
+               + 0.10 × Valuation_percentile
 ```
 
 ## Algorithm Consistency
@@ -427,7 +472,7 @@ Potential stocks have relaxed criteria:
 - `cache/index_constituents/` - Index member lists (cached and reused between builds)
 - `cache/stocks_data/` - Individual stock data (saved for debugging only, NOT loaded during full builds)
 
-[build_fund.py](build_fund.py:773) creates:
+[build_fund.py](build_fund.py:185) creates:
 - `logs/` - Data acquisition failure logs
 
 **Important**: During a full build (`python build_fund.py --index ...`), stock data is ALWAYS fetched fresh from APIs. Cache files are saved for debugging and manual analysis but are never loaded. The quarterly update (`--update` flag) is the exception: it intentionally loads cached `Stock` objects from `cache/stocks_data/` to avoid re-fetching the full index.

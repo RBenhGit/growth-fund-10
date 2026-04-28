@@ -94,34 +94,43 @@ class TestCalculateGrowthRate:
 
 
 # ---------------------------------------------------------------------------
-# normalize_score
+# rank_percentile (replaces min-max normalize_score)
 # ---------------------------------------------------------------------------
 
-class TestNormalizeScore:
+class TestRankPercentile:
     def test_normalizes_to_0_and_100(self):
         builder = make_builder()
-        result = builder.normalize_score([0.0, 50.0, 100.0])
+        result = builder.rank_percentile([0.0, 50.0, 100.0])
         assert result[0] == pytest.approx(0.0)
         assert result[-1] == pytest.approx(100.0)
 
     def test_all_equal_values_returns_50(self):
         builder = make_builder()
-        result = builder.normalize_score([42.0, 42.0, 42.0])
+        result = builder.rank_percentile([42.0, 42.0, 42.0])
         assert all(v == 50.0 for v in result)
 
     def test_empty_input_returns_empty(self):
         builder = make_builder()
-        assert builder.normalize_score([]) == []
+        assert builder.rank_percentile([]) == []
 
     def test_single_value_returns_50(self):
         builder = make_builder()
-        result = builder.normalize_score([99.0])
+        result = builder.rank_percentile([99.0])
         assert result == [50.0]
 
     def test_relative_ordering_preserved(self):
         builder = make_builder()
-        result = builder.normalize_score([10.0, 20.0, 30.0])
+        result = builder.rank_percentile([10.0, 20.0, 30.0])
         assert result[0] < result[1] < result[2]
+
+    def test_ties_get_average_rank(self):
+        builder = make_builder()
+        # [10, 20, 20, 30] -> ranks [0, 1.5, 1.5, 3] -> [0%, 50%, 50%, 100%]
+        result = builder.rank_percentile([10.0, 20.0, 20.0, 30.0])
+        assert result[0] == pytest.approx(0.0)
+        assert result[1] == pytest.approx(50.0)
+        assert result[2] == pytest.approx(50.0)
+        assert result[3] == pytest.approx(100.0)
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +151,13 @@ class TestCalculateBaseScore:
         builder = make_builder()
         stock = Stock(symbol="EMPTY", name="Empty", index="SP500")
         result = builder.calculate_base_score(stock)
-        assert result == 0.0
+        assert result == {
+            "net_income_growth": 0.0,
+            "net_income_stability": 0.0,
+            "revenue_growth": 0.0,
+            "revenue_stability": 0.0,
+            "market_cap": 0.0
+        }
 
     def test_market_cap_matches_stock(self):
         builder = make_builder()

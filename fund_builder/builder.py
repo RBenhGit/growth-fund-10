@@ -54,68 +54,136 @@ class FundBuilder:
         if start_value <= 0:
             return None
 
-        # CAGR formula: ((end_value / start_value) ^ (1 / years)) - 1
+        # CAGR formula: ((end_value / start_value) ^ (1 / period)) - 1
+        # Use explicit (years - 1) as period to ensure a consistent annualization
+        # regardless of calendar year gaps (e.g. after LTM merging adds a non-consecutive year).
+        # With years=5 this always computes a 4-year CAGR.
         try:
-            cagr = (pow(end_value / start_value, 1 / (years - 1)) - 1) * 100
+            period = years - 1
+            if period <= 0:
+                return None
+            cagr = (pow(end_value / start_value, 1 / period) - 1) * 100
             return cagr
         except (ZeroDivisionError, ValueError):
             return None
 
-    def normalize_score(self, values: List[float]) -> List[float]:
+    def calculate_growth_stability(self, values: Dict[int, float], years: int = 5) -> Optional[float]:
         """
-        נרמול ציונים לטווח 0-100
+        R² of log(value) ~ year_index for the most-recent `years` data points.
+        R²=1.0 = perfect log-linear compounder; R²≈0 = chaotic/boom-bust path.
+        Rewards steady growth, penalizes volatility.
 
         Args:
-            values: רשימת ערכים
+            values: dict of {year: value}
+            years: number of most-recent points to use (up to 5)
 
         Returns:
-            List[float]: ערכים מנורמלים
+            Optional[float]: R² (0-1), None if < 2 positive values
         """
-        if not values:
+        sorted_years = sorted(values.keys(), reverse=True)[:years]
+        points = sorted([(yr, values[yr]) for yr in sorted_years if values[yr] > 0])
+
+        if len(points) < 2:
+            return None
+
+        xs = list(range(len(points)))  # year index 0..n-1
+        ys = [math.log(v) for _, v in points]
+        n = len(xs)
+
+        x_mean = sum(xs) / n
+        y_mean = sum(ys) / n
+
+        ss_xx = sum((x - x_mean) ** 2 for x in xs)
+        if ss_xx == 0:
+            return 1.0  # constant x — degenerate case
+
+        b = sum((xs[i] - x_mean) * (ys[i] - y_mean) for i in range(n)) / ss_xx
+        a = y_mean - b * x_mean
+
+        ss_tot = sum((y - y_mean) ** 2 for y in ys)
+        if ss_tot == 0:
+            return 1.0  # perfectly flat log series
+
+        ss_res = sum((ys[i] - (a + b * xs[i])) ** 2 for i in range(n))
+        return max(0.0, 1.0 - ss_res / ss_tot)
+
+    def rank_percentile(self, values: List[float]) -> List[float]:
+        """
+        Rank-percentile normalization. Tied values get average rank. Returns 0-100 scale.
+
+        Args:
+            values: list of numeric values
+
+        Returns:
+            List[float]: percentile ranks (0-100), tied values share average rank
+        """
+        n = len(values)
+        if n == 0:
             return []
+        if n == 1:
+            return [50.0]
 
-        min_val = min(values)
-        max_val = max(values)
+        indexed = sorted(enumerate(values), key=lambda x: x[1])
+        ranks = [0.0] * n
+        i = 0
+        while i < n:
+            j = i
+            while j < n - 1 and indexed[j][1] == indexed[j + 1][1]:
+                j += 1
+            # indices i..j have the same value; assign average rank
+            avg_rank = (i + j) / 2
+            for k in range(i, j + 1):
+                ranks[indexed[k][0]] = avg_rank / (n - 1) * 100
+            i = j + 1
+        return ranks
 
-        if max_val == min_val:
-            return [50.0] * len(values)
-
-        return [((v - min_val) / (max_val - min_val)) * 100 for v in values]
-
-    def calculate_base_score(self, stock: Stock) -> float:
+    def calculate_base_score(self, stock: Stock) -> Dict[str, float]:
         """
-        חישוב ציון מניית בסיס
+        חישוב ציון מניית בסיס עם מדדי גדילה ויציבות
 
         משקולות:
-        - צמיחת רווח נקי: 40%
-        - צמיחת הכנסות: 35%
+        - צמיחת רווח נקי (CAGR): 40%
+        - צמיחת הכנסות (CAGR): 35%
         - גודל חברה (שווי שוק): 25%
+
+        כל ציר צמיחה משולב: 70% CAGR + 30% R² stability
 
         Args:
             stock: מניה
 
         Returns:
-            float: ציון סופי
+            Dict[str, float]: ציונים עבור כל קריטריון (growth, stability, market_cap)
         """
         if not stock.financial_data:
-            return 0.0
+            return {
+                "net_income_growth": 0.0,
+                "net_income_stability": 0.0,
+                "revenue_growth": 0.0,
+                "revenue_stability": 0.0,
+                "market_cap": 0.0
+            }
 
-        # צמיחת רווח נקי (5 נקודות נתונים → CAGR של 4 שנים)
-        net_income_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 5)
-        if net_income_growth is None:
-            net_income_growth = 0.0
+        # צמיחת רווח נקי (BASE_GROWTH_YEARS נקודות נתונים → CAGR של 4 שנים)
+        years = settings.BASE_GROWTH_YEARS
+        net_income_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, years) or 0.0
 
-        # צמיחת הכנסות (5 נקודות נתונים → CAGR של 4 שנים)
-        revenue_growth = self.calculate_growth_rate(stock.financial_data.revenues, 5)
-        if revenue_growth is None:
-            revenue_growth = 0.0
+        # יציבות רווח נקי (R² of log-linear regression)
+        net_income_stability = self.calculate_growth_stability(stock.financial_data.net_incomes, years) or 0.0
+
+        # צמיחת הכנסות (BASE_GROWTH_YEARS נקודות נתונים → CAGR של 4 שנים)
+        revenue_growth = self.calculate_growth_rate(stock.financial_data.revenues, years) or 0.0
+
+        # יציבות הכנסות
+        revenue_stability = self.calculate_growth_stability(stock.financial_data.revenues, years) or 0.0
 
         # גודל חברה (שווי שוק)
         market_cap_score = stock.market_cap or 0.0
 
         return {
             "net_income_growth": net_income_growth,
+            "net_income_stability": net_income_stability,
             "revenue_growth": revenue_growth,
+            "revenue_stability": revenue_stability,
             "market_cap": market_cap_score
         }
 
@@ -169,7 +237,14 @@ class FundBuilder:
 
     def score_and_rank_base_stocks(self, stocks: List[Stock]) -> List[Stock]:
         """
-        ציון ודירוג מניות בסיס
+        ציון ודירוג מניות בסיס עם יציבות צמיחה
+
+        Blending formula per growth axis:
+          NI_blended   = 0.70 × NI_CAGR_rank   + 0.30 × NI_stability_rank
+          Rev_blended  = 0.70 × Rev_CAGR_rank  + 0.30 × Rev_stability_rank
+
+        Final base score:
+          base_score = 0.40 × NI_blended + 0.35 × Rev_blended + 0.25 × MarketCap_rank
 
         Args:
             stocks: רשימת מניות
@@ -185,31 +260,41 @@ class FundBuilder:
                 stock._raw_scores = scores
                 scored_stocks.append(stock)
 
-        # נרמול ציונים
+        # Rank-percentile normalization for each component
         if scored_stocks:
-            net_income_scores = [s._raw_scores["net_income_growth"] for s in scored_stocks]
-            revenue_scores = [s._raw_scores["revenue_growth"] for s in scored_stocks]
-            market_cap_scores = [s._raw_scores["market_cap"] for s in scored_stocks]
-
-            normalized_net_income = self.normalize_score(net_income_scores)
-            normalized_revenue = self.normalize_score(revenue_scores)
-            normalized_market_cap = self.normalize_score(market_cap_scores)
+            ni_cagr_ranks    = self.rank_percentile([s._raw_scores["net_income_growth"] for s in scored_stocks])
+            ni_stab_ranks    = self.rank_percentile([s._raw_scores["net_income_stability"] for s in scored_stocks])
+            rev_cagr_ranks   = self.rank_percentile([s._raw_scores["revenue_growth"] for s in scored_stocks])
+            rev_stab_ranks   = self.rank_percentile([s._raw_scores["revenue_stability"] for s in scored_stocks])
+            mcap_ranks       = self.rank_percentile([s._raw_scores["market_cap"] for s in scored_stocks])
 
             for i, stock in enumerate(scored_stocks):
+                # Blended sub-scores: 70% CAGR rank + 30% stability rank
+                ni_blended  = 0.7 * ni_cagr_ranks[i]  + 0.3 * ni_stab_ranks[i]
+                rev_blended = 0.7 * rev_cagr_ranks[i] + 0.3 * rev_stab_ranks[i]
+
+                # Final weighted score
                 final_score = (
-                    normalized_net_income[i] * settings.BASE_SCORE_WEIGHTS["net_income_growth"] +
-                    normalized_revenue[i] * settings.BASE_SCORE_WEIGHTS["revenue_growth"] +
-                    normalized_market_cap[i] * settings.BASE_SCORE_WEIGHTS["market_cap"]
+                    settings.BASE_SCORE_WEIGHTS["net_income_growth"] * ni_blended  +
+                    settings.BASE_SCORE_WEIGHTS["revenue_growth"] * rev_blended +
+                    settings.BASE_SCORE_WEIGHTS["market_cap"] * mcap_ranks[i]
                 )
                 stock.base_score = final_score
+
                 # שמירת ציונים משנה
                 stock.base_scores_detail = {
                     "net_income_growth_raw": stock._raw_scores["net_income_growth"],
+                    "net_income_stability_raw": stock._raw_scores["net_income_stability"],
                     "revenue_growth_raw": stock._raw_scores["revenue_growth"],
+                    "revenue_stability_raw": stock._raw_scores["revenue_stability"],
                     "market_cap_raw": stock._raw_scores["market_cap"],
-                    "net_income_growth_normalized": normalized_net_income[i],
-                    "revenue_growth_normalized": normalized_revenue[i],
-                    "market_cap_normalized": normalized_market_cap[i]
+                    "ni_cagr_rank": ni_cagr_ranks[i],
+                    "ni_stab_rank": ni_stab_ranks[i],
+                    "ni_blended": ni_blended,
+                    "rev_cagr_rank": rev_cagr_ranks[i],
+                    "rev_stab_rank": rev_stab_ranks[i],
+                    "rev_blended": rev_blended,
+                    "mcap_rank": mcap_ranks[i]
                 }
 
                 # Verify assignment
@@ -224,7 +309,10 @@ class FundBuilder:
 
     def score_and_rank_potential_stocks(self, stocks: List[Stock], index_pe: Optional[float]) -> List[Stock]:
         """
-        ציון ודירוג מניות פוטנציאל
+        ציון ודירוג מניות פוטנציאל (growth-focused, no stability blend)
+
+        Final potential score:
+          potential_score = 0.70 × FutureGrowth_rank + 0.20 × Momentum_rank + 0.10 × Valuation_rank
 
         Args:
             stocks: רשימת מניות
@@ -241,31 +329,28 @@ class FundBuilder:
                 stock._raw_scores = scores
                 scored_stocks.append(stock)
 
-        # נרמול ציונים
+        # Rank-percentile normalization for each component
         if scored_stocks:
-            future_growth_scores = [s._raw_scores["future_growth"] for s in scored_stocks]
-            momentum_scores = [s._raw_scores["momentum"] for s in scored_stocks]
-            valuation_scores = [s._raw_scores["valuation"] for s in scored_stocks]
-
-            normalized_growth = self.normalize_score(future_growth_scores)
-            normalized_momentum = self.normalize_score(momentum_scores)
-            normalized_valuation = self.normalize_score(valuation_scores)
+            growth_ranks    = self.rank_percentile([s._raw_scores["future_growth"] for s in scored_stocks])
+            momentum_ranks  = self.rank_percentile([s._raw_scores["momentum"] for s in scored_stocks])
+            valuation_ranks = self.rank_percentile([s._raw_scores["valuation"] for s in scored_stocks])
 
             for i, stock in enumerate(scored_stocks):
                 final_score = (
-                    normalized_growth[i] * settings.POTENTIAL_SCORE_WEIGHTS["future_growth"] +
-                    normalized_momentum[i] * settings.POTENTIAL_SCORE_WEIGHTS["momentum"] +
-                    normalized_valuation[i] * settings.POTENTIAL_SCORE_WEIGHTS["valuation"]
+                    settings.POTENTIAL_SCORE_WEIGHTS["future_growth"] * growth_ranks[i] +
+                    settings.POTENTIAL_SCORE_WEIGHTS["momentum"] * momentum_ranks[i] +
+                    settings.POTENTIAL_SCORE_WEIGHTS["valuation"] * valuation_ranks[i]
                 )
                 stock.potential_score = final_score
+
                 # שמירת ציונים משנה
                 stock.potential_scores_detail = {
                     "future_growth_raw": stock._raw_scores["future_growth"],
                     "momentum_raw": stock._raw_scores["momentum"],
                     "valuation_raw": stock._raw_scores["valuation"],
-                    "future_growth_normalized": normalized_growth[i],
-                    "momentum_normalized": normalized_momentum[i],
-                    "valuation_normalized": normalized_valuation[i]
+                    "growth_rank": growth_ranks[i],
+                    "momentum_rank": momentum_ranks[i],
+                    "valuation_rank": valuation_ranks[i]
                 }
 
                 # Verify assignment

@@ -150,7 +150,7 @@ def save_stock_to_cache(stock, cache_dir):
         raise
 
 
-from utils.dedup import get_base_company_name, select_stocks_skip_duplicates  # noqa: F401
+from utils.dedup import get_base_company_name, select_stocks_skip_duplicates
 
 
 def write_data_quality_log(

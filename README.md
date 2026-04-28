@@ -29,9 +29,28 @@ An automated system for building and managing investment portfolios based on sto
 
 Each fund consists of **10 stocks**:
 - **6 Base Stocks**: Established companies with 5+ years of proven profitability
-- **4 Potential Stocks**: High-growth candidates with 2+ years of profitability
+- **4 Potential Stocks**: High-growth candidates with 3+ years of profitability
 
 **Fixed Weights**: 18%, 16%, 16%, 10%, 10%, 10%, 6%, 6%, 4%, 4%
+
+### Scoring Formula
+
+**Base Stocks (Steady Growers):**
+Each stock is scored using a **blended growth-stability model**:
+- **CAGR**: 4-year compound annual growth rate over 5 fiscal years
+- **R² Stability**: Measures consistency of log-linear growth (1.0 = perfect compounder, 0 = chaotic)
+- **Blended per axis**: Net Income = 70% CAGR + 30% R²; Revenue = 70% CAGR + 30% R²
+- **Final score**: 40% NI blended + 35% Revenue blended + 25% Market cap (rank-percentile)
+
+**Potential Stocks (High Growth):**
+Growth-focused ranking (no stability blend):
+- **Future Growth**: 70% (3-year CAGR)
+- **Momentum**: 20% (1-year price change)
+- **Valuation**: 10% (relative P/E)
+
+All metrics use **rank-percentile normalization** (0–100 scale, distribution-agnostic).
+
+For detailed formulas, see [CLAUDE.md](CLAUDE.md#scoring-formulas).
 
 ## 🚀 Installation
 
@@ -221,7 +240,7 @@ python backtest.py Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md --years 10
 |-----------|-------------|---------|---------|
 | `fund_file` | Path to fund markdown file | *Required* | `Fund_Docs/SP500/Q4_2025/Fund_10_SP500_Q4_2025.md` |
 | `--years` | Number of years to backtest | 10 | `5`, `10`, `15` |
-| `--output-dir` | Directory for reports/charts | `Fund_Docs` | `Backtest_Results` |
+| `--output-dir` | Directory for reports/charts | Same directory as fund file | `Backtest_Results` |
 
 ### Backtest Examples
 

@@ -98,6 +98,9 @@ class Settings:
     # משקלות קרן (קבועים) - 10 מניות: 6 בסיס + 4 פוטנציאל
     FUND_WEIGHTS = [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
 
+    # מספר שנים לחישוב צמיחה לבסיס (CAGR over 4 periods = 5 data points)
+    BASE_GROWTH_YEARS = 5
+
     # משקלות לחישוב ציון בסיס
     BASE_SCORE_WEIGHTS = {
         "net_income_growth": 0.40,
@@ -105,11 +108,14 @@ class Settings:
         "market_cap": 0.25
     }
 
-    # משקלות לחישוב ציון פוטנציאל
+    # משקל היציבות בתוך כל ציר צמיחה (0.7 CAGR + 0.3 stability)
+    STABILITY_BLEND = 0.30
+
+    # משקלות לחישוב ציון פוטנציאל (growth-focused: 70% growth, 20% momentum, 10% valuation)
     POTENTIAL_SCORE_WEIGHTS = {
-        "future_growth": 0.50,
-        "momentum": 0.30,
-        "valuation": 0.20
+        "future_growth": 0.70,
+        "momentum": 0.20,
+        "valuation": 0.10
     }
 
     # קריטריוני סינון מניות בסיס

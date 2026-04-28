@@ -96,20 +96,29 @@ def merge_ltm_into_stock(
 
     ltm_year = ltm_data["ltm_year"]
 
-    # Add LTM values as the most recent year
+    # Add LTM values into the financial history.
+    # When ltm_year is already in the cached data, update it directly.
+    # When ltm_year is newer than all cached years (i.e., it would extend
+    # the series), store the LTM data under the most recent cached year
+    # instead. This prevents the CAGR sliding window from shifting forward
+    # by one year, which would otherwise cause large score swings from a
+    # pure date-window artifact rather than any change in business performance.
     if updated.financial_data:
         fd = updated.financial_data
-        fd.revenues[ltm_year] = ltm_data["ltm_revenue"]
-        fd.net_incomes[ltm_year] = ltm_data["ltm_net_income"]
-        fd.operating_incomes[ltm_year] = ltm_data["ltm_operating_income"]
-        fd.operating_cash_flows[ltm_year] = ltm_data["ltm_operating_cash_flow"]
+        existing_rev_years = sorted(fd.revenues.keys(), reverse=True) if fd.revenues else []
+        target_year = ltm_year if (ltm_year in fd.revenues or not existing_rev_years) else existing_rev_years[0]
+
+        fd.revenues[target_year] = ltm_data["ltm_revenue"]
+        fd.net_incomes[target_year] = ltm_data["ltm_net_income"]
+        fd.operating_incomes[target_year] = ltm_data["ltm_operating_income"]
+        fd.operating_cash_flows[target_year] = ltm_data["ltm_operating_cash_flow"]
 
         # Update debt/equity from latest quarterly balance sheet
         fd.total_debt = ltm_data["total_debt"]
         fd.total_equity = ltm_data["total_equity"]
 
         logger.debug(
-            f"{stock.symbol}: Merged LTM year {ltm_year} — "
+            f"{stock.symbol}: LTM {ltm_year} stored under year slot {target_year} — "
             f"revenue={ltm_data['ltm_revenue']:.0f}, "
             f"net_income={ltm_data['ltm_net_income']:.0f}, "
             f"quarters={ltm_data['quarters_used']}"

@@ -1,40 +1,38 @@
 # השוואה רבעונית — Fund_10_SP500_Q2_2026
 
-עדכון מ: Fund_10_SP500_Q1_2026 (2026-03-23)
-עדכון ל: Fund_10_SP500_Q2_2026 (2026-04-10)
+עדכון מ: Fund_10_SP500_Q2_2026 (2026-04-11)
+עדכון ל: Fund_10_SP500_Q2_2026 (2026-04-11)
 
 ## סיכום שינויים
 
-- מניות שנוספו: 5
-- מניות שהוסרו: 5
-- מניות שנשארו: 5
+- מניות שנוספו: 3
+- מניות שהוסרו: 3
+- מניות שנשארו: 7
 
 ## מניות חדשות
 
 | סימול | שם | סוג | משקל | ציון |
 |-------|-----|-----|------|------|
-| NWS.US | News Corp B | בסיס | 10.0% | 40.03 |
-| NWSA.US | News Corp A | בסיס | 10.0% | 40.03 |
-| STX.US | Seagate Technology PLC | פוטנציאל | 6.0% | 56.24 |
-| EQT.US | EQT Corporation | פוטנציאל | 4.0% | 50.19 |
-| SMCI.US | Super Micro Computer Inc | פוטנציאל | 4.0% | 48.73 |
+| BKNG.US | Booking Holdings Inc | בסיס | 10.0% | 31.34 |
+| SMCI.US | Super Micro Computer Inc | פוטנציאל | 4.0% | 50.67 |
+| AVGO.US | Broadcom Inc | פוטנציאל | 4.0% | 48.16 |
 
 ## מניות שהוסרו
 
 | סימול | שם | סוג | משקל קודם | ציון קודם |
 |-------|-----|-----|-----------|----------|
-| GOOGL.US | Alphabet Inc Class A | בסיס | 16.0% | 51.08 |
-| MSFT.US | Microsoft Corporation | בסיס | 10.0% | 44.18 |
-| INCY.US | Incyte Corporation | פוטנציאל | 6.0% | 73.75 |
-| MU.US | Micron Technology Inc | פוטנציאל | 6.0% | 54.85 |
-| PLTR.US | Palantir Technologies Inc. | פוטנציאל | 4.0% | 52.22 |
+| GOOGL.US | Alphabet Inc Class A | בסיס | 16.0% | 50.93 |
+| MSFT.US | Microsoft Corporation | בסיס | 10.0% | 45.56 |
+| PLTR.US | Palantir Technologies Inc. | פוטנציאל | 6.0% | 63.06 |
 
 ## מניות שנשארו
 
 | סימול | שם | משקל קודם | משקל חדש | ציון קודם | ציון חדש | שינוי |
 |-------|-----|-----------|----------|-----------|---------|-------|
-| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 89.48 | 84.49 | → |
-| TKO.US | TKO Group Holdings, Inc. | 16.0% | 16.0% | 53.98 | 46.08 | → |
-| AMD.US | Advanced Micro Devices Inc | 10.0% | 10.0% | 48.77 | 43.74 | → |
-| STE.US | STERIS plc | 10.0% | 16.0% | 44.86 | 46.20 | ↑ |
-| GILD.US | Gilead Sciences Inc | 4.0% | 6.0% | 49.76 | 69.69 | ↑ |
+| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 100.00 | 100.00 | → |
+| NOW.US | ServiceNow Inc | 16.0% | 16.0% | 49.09 | 39.32 | → |
+| ANET.US | Arista Networks | 10.0% | 16.0% | 47.76 | 33.56 | ↑ |
+| TKO.US | TKO Group Holdings, Inc. | 10.0% | 10.0% | 46.68 | 28.29 | → |
+| MRK.US | Merck & Company Inc | 6.0% | 6.0% | 76.07 | 74.62 | → |
+| HWM.US | Howmet Aerospace Inc | 4.0% | 10.0% | 58.59 | 29.09 | ↑ |
+| APP.US | Applovin Corp | 4.0% | 6.0% | 56.18 | 50.75 | ↑ |

@@ -50,6 +50,104 @@ python tests/test_all_sources.py
 pip install -r requirements.txt
 ```
 
+## Automated Scheduling (Windows Task Scheduler)
+
+The fund builder can run on a fully automated annual schedule aligned with earnings seasons. The system is configured to:
+- **Feb 25**: Full rebuild of both indexes (SP500 + TASE125) + follow-up LTM update
+- **May 25, Aug 25, Nov 25**: Quarterly LTM updates only
+
+**For detailed setup and monitoring instructions, see [SCHEDULING.md](SCHEDULING.md).**
+
+### Setup (One-time)
+
+1. **Run from Administrator PowerShell prompt:**
+```powershell
+cd "d:\python\finance\קרן צמיחה 10"
+.\scripts\schedule_tasks.ps1
+```
+
+2. **Verify the tasks registered:**
+```powershell
+Get-ScheduledTask -TaskPath "\FundBuilder\" | Format-Table TaskName, State, NextRunTime
+```
+
+### Scheduled Tasks Created
+
+| Task Name | Date | Mode | Runtime | Credits |
+|---|---|---|---|---|
+| `FundBuild_Feb25` | Feb 25 @ 7:00 AM | full + update | ~2 hours | ~600K |
+| `FundUpdate_May25` | May 25 @ 7:00 AM | update | ~10 min | ~60K |
+| `FundUpdate_Aug25` | Aug 25 @ 7:00 AM | update | ~10 min | ~60K |
+| `FundUpdate_Nov25` | Nov 25 @ 7:00 AM | update | ~10 min | ~60K |
+
+**Why these dates?**
+- **Feb 25**: Q4 earnings season ends → annual data is complete
+- **May 25**: Q1 earnings season ends → run quarterly update (earliest time after earnings close)
+- **Aug 25**: Q2 earnings season ends
+- **Nov 25**: Q3 earnings season ends
+
+### Implementation Files
+
+**`scripts/run_fund.ps1`** — Main execution wrapper
+- Called by each scheduled task
+- Parameters: `-Mode "full"` or `-Mode "update"`
+- Logs output to `logs/scheduled_YYYY-MM-DD.log`
+- Handles Hebrew text encoding for Windows console
+- Gracefully activates venv if present
+
+**`scripts/schedule_tasks.ps1`** — Task registration utility
+- Creates 4 tasks in `\FundBuilder\` Task Scheduler folder
+- Idempotent (safe to re-run)
+- Requires Administrator privileges
+
+### Manual Testing
+
+Before relying on automated runs, test the wrapper:
+
+```powershell
+cd "d:\python\finance\קרן צמיחה 10\scripts"
+
+# Test update mode (cheap: ~5 min, ~30K credits)
+.\run_fund.ps1 -Mode update
+
+# Verify success
+Get-Content ..\logs\scheduled_*.log -Tail 50
+```
+
+### Monitoring & Logs
+
+After each scheduled date, check the run:
+
+```powershell
+# View latest log
+Get-Item "d:\python\finance\קרן צמיחה 10\logs\scheduled_*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+# Search for completion status
+Select-String "COMPLETED SUCCESSFULLY\|COMPLETED WITH ERRORS" logs\scheduled*.log
+
+# View specific task's last run
+(Get-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\") | Select-Object LastRunTime, LastTaskResult
+```
+
+### Troubleshooting
+
+**Task didn't run on scheduled date:**
+- Check: Is the computer on and logged in at 7:00 AM on that date?
+- Task Scheduler with `LogonType = Interactive` only runs when user is logged in
+- Setting `StartWhenAvailable = True` means it will run ASAP next time computer is available
+
+**Task ran but failed:**
+- Check the log file: `logs/scheduled_YYYY-MM-DD.log`
+- Most common issues: API rate limit, network error, or missing `.env` file
+- The task logs all Python output to the log file for debugging
+
+**Need to modify a task:**
+```powershell
+# Remove and re-create:
+Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -Confirm:$false
+.\scripts\schedule_tasks.ps1  # Re-register all 4 tasks
+```
+
 ## Architecture Overview
 
 ### Core Components
@@ -89,6 +187,17 @@ pip install -r requirements.txt
   - `find_latest_fund_dir()` - Scans for most recent quarter folder
   - `find_previous_fund_dir()` - Finds the quarter folder before the current one
 
+**Scheduling & Automation (Windows Task Scheduler):**
+- [scripts/run_fund.ps1](scripts/run_fund.ps1) - PowerShell wrapper that executes fund builds/updates
+  - Called by Windows Task Scheduler on 4 annual dates (Feb 25, May 25, Aug 25, Nov 25)
+  - Logs all output with timestamps to `logs/scheduled_YYYY-MM-DD.log`
+  - Handles Hebrew text encoding, venv activation, and error tracking
+  - Parameters: `-Mode "full"` for full rebuild + update, `-Mode "update"` for LTM update only
+- [scripts/schedule_tasks.ps1](scripts/schedule_tasks.ps1) - One-time setup script to register scheduled tasks
+  - Must be run as Administrator
+  - Creates 4 tasks in `\FundBuilder\` Task Scheduler folder
+  - Idempotent — safe to re-run if tasks need to be updated
+
 ### Directory Structure
 ```
 ├── build_fund.py           # Main entry point (full build + --update)
@@ -118,6 +227,9 @@ pip install -r requirements.txt
 │   ├── changelog.py            # CHANGELOG.md management
 │   ├── dedup.py                # Company deduplication: skip multi-class shares
 │   └── migrate_fund_docs.py    # One-time folder migration
+├── scripts/
+│   ├── run_fund.ps1            # Execution wrapper (called by scheduled tasks)
+│   └── schedule_tasks.ps1      # Task registration (run as Admin one-time to set up)
 ├── tests/
 │   ├── test_all_sources.py
 │   ├── test_quarterly_update.py
@@ -473,7 +585,12 @@ Potential stocks have relaxed criteria:
 - `cache/stocks_data/` - Individual stock data (saved for debugging only, NOT loaded during full builds)
 
 [build_fund.py](build_fund.py:185) creates:
-- `logs/` - Data acquisition failure logs
+- `logs/` - Data acquisition failure logs and scheduled automation logs
+
+**Log files:**
+- `logs/data_quality_*.json` - Data failures during API fetches (one per build)
+- `logs/data_failures_*.json` - Summary of failed stocks per index/quarter
+- `logs/scheduled_YYYY-MM-DD.log` - Output from automated scheduled runs (created by `run_fund.ps1`)
 
 **Important**: During a full build (`python build_fund.py --index ...`), stock data is ALWAYS fetched fresh from APIs. Cache files are saved for debugging and manual analysis but are never loaded. The quarterly update (`--update` flag) is the exception: it intentionally loads cached `Stock` objects from `cache/stocks_data/` to avoid re-fetching the full index.
 

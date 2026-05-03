@@ -10,6 +10,7 @@ An automated system for building and managing investment portfolios based on sto
 - [Configuration](#configuration)
 - [Running the App](#running-the-app)
 - [Quarterly Updates](#quarterly-update-ltm-based-rebalancing)
+- [Automated Scheduling](#-automated-scheduling)
 - [Backtesting](#backtesting)
 - [Testing Data Sources](#testing-data-sources)
 - [Project Structure](#project-structure)
@@ -21,6 +22,7 @@ An automated system for building and managing investment portfolios based on sto
 - **Hybrid Data Sources**: Uses TwelveData API for financial data and yfinance for pricing
 - **Automated Scoring**: Multi-factor scoring system for stock selection
 - **Quarterly Updates**: LTM-based rebalancing using cached data (~10x cheaper than full rebuild)
+- **Automated Scheduling**: Windows Task Scheduler integration for annual unattended runs (Feb 25, May 25, Aug 25, Nov 25)
 - **Smart Caching**: Reduces API calls and improves performance
 - **Beautiful CLI**: Rich terminal UI with progress bars and tables
 - **Hebrew Support**: Full Hebrew language support for Israeli market
@@ -185,6 +187,26 @@ python build_fund.py --index SP500 --quarter Q2 --year 2026 --update
 **How it works**: Parses the previous `_Update.md` to identify top candidates, loads cached financial data, fetches 4 quarters of financial reports from TwelveData, computes LTM (Last Twelve Months) values, and re-scores all candidates.
 
 **Cost**: ~30K API credits vs ~300K for a full rebuild.
+
+### ⏰ Automated Scheduling
+
+Run fund builds automatically on a schedule aligned with earnings seasons using **Windows Task Scheduler**:
+
+```powershell
+# One-time setup (from Administrator PowerShell):
+cd "d:\python\finance\קרן צמיחה 10"
+.\scripts\schedule_tasks.ps1
+```
+
+This registers **4 annual tasks**:
+- **Feb 25 @ 7:00 AM**: Full rebuild (all 500+ stocks) + LTM update (~2 hours, ~600K credits)
+- **May 25 @ 7:00 AM**: LTM update only (~10 min, ~60K credits)
+- **Aug 25 @ 7:00 AM**: LTM update only (~10 min, ~60K credits)
+- **Nov 25 @ 7:00 AM**: LTM update only (~10 min, ~60K credits)
+
+All runs log to `logs/scheduled_YYYY-MM-DD.log` for monitoring.
+
+**For detailed setup, monitoring, and troubleshooting, see [SCHEDULING.md](SCHEDULING.md).**
 
 ### Command Line Arguments
 

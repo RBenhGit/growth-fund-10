@@ -184,20 +184,7 @@ class TestCalculatePotentialScore:
         builder = make_builder()
         stock = Stock(symbol="EMPTY", name="Empty", index="SP500")
         result = builder.calculate_potential_score(stock)
-        assert result == {"future_growth": 0.0, "momentum": 0.0, "valuation": 0.0}
-
-    def test_valuation_with_pe_and_index_pe(self):
-        builder = make_builder()
-        stock = make_stock_with_data(pe_ratio=20.0)
-        result = builder.calculate_potential_score(stock, index_pe=20.0)
-        # relative_pe = 1.0 → valuation = (2 - 1) * 50 = 50
-        assert result["valuation"] == pytest.approx(50.0)
-
-    def test_valuation_zero_when_no_pe(self):
-        builder = make_builder()
-        stock = make_stock_with_data(pe_ratio=None)
-        result = builder.calculate_potential_score(stock, index_pe=20.0)
-        assert result["valuation"] == pytest.approx(0.0)
+        assert result == {"future_growth": 0.0, "momentum": 0.0}
 
 
 # ---------------------------------------------------------------------------

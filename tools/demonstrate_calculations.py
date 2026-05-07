@@ -210,20 +210,6 @@ def section_a1_data_level_metrics(md, nvda, mu):
     md.append(f"         = {fmt_pct(momentum)}")
     md.append(f"```\n")
 
-    # --- Valuation (MU) ---
-    md.append("### Valuation Score (MU) — Relative P/E\n")
-    md.append(f"**Formula:** `valuation_score = (2 - (stock_pe / index_pe)) × 50`")
-    md.append(f"**Source:** `fund_builder/builder.py:152-157`\n")
-    md.append(f"| Variable | Value |")
-    md.append(f"|----------|-------|")
-    md.append(f"| stock_pe (MU) | {fmt_raw(mu.pe_ratio)} |")
-    md.append(f"| index_pe (computed) | *Shown below — depends on candidate pool (see A3 and C6)* |")
-    md.append(f"\nThe valuation formula maps P/E relative to the index average:")
-    md.append(f"- P/E = index P/E → score = 50 (average)")
-    md.append(f"- P/E < index P/E → score > 50 (cheap = good)")
-    md.append(f"- P/E > index P/E → score < 50 (expensive = bad)")
-    md.append(f"- P/E > 2× index P/E → score < 0 (penalized)\n")
-
     return cagr_ni, cagr_rev, cagr_mu, momentum
 
 
@@ -325,7 +311,7 @@ def section_a2_eligibility(md, nvda, mu):
     md.append(f"\n**MU Potential Eligibility: PASS**\n")
 
 
-def section_a3_raw_scoring(md, ranked_base, ranked_potential, index_pe):
+def section_a3_raw_scoring(md, ranked_base, ranked_potential):
     """A3: Raw Scoring Metrics — uses scores already computed by score_and_rank_*"""
     md.append("## A3. Raw Scoring Metrics (All Candidates)\n")
     md.append("These raw values were computed by `score_and_rank_base_stocks()` and `score_and_rank_potential_stocks()`")
@@ -339,7 +325,6 @@ def section_a3_raw_scoring(md, ranked_base, ranked_potential, index_pe):
     md.append("- `revenue_growth_raw` = CAGR(revenues, years=3)")
     md.append("- `market_cap_raw` = stock.market_cap\n")
 
-    # All scored base stocks have base_scores_detail
     scored_base = [s for s in ranked_base if s.base_scores_detail]
 
     md.append("| # | Symbol | net_income_growth | revenue_growth | market_cap | **Final Score** |")
@@ -349,7 +334,6 @@ def section_a3_raw_scoring(md, ranked_base, ranked_potential, index_pe):
         marker = " **←**" if stock.symbol == SAMPLE_BASE_SYMBOL else ""
         md.append(f"| {i+1} | {stock.symbol}{marker} | {fmt_pct(d['net_income_growth_raw'])} | {fmt_pct(d['revenue_growth_raw'])} | {fmt_num(d['market_cap_raw'])} | **{fmt_raw(stock.base_score)}** |")
 
-    # Show min/max
     ni_vals = [s.base_scores_detail['net_income_growth_raw'] for s in scored_base]
     rev_vals = [s.base_scores_detail['revenue_growth_raw'] for s in scored_base]
     mc_vals = [s.base_scores_detail['market_cap_raw'] for s in scored_base]
@@ -365,27 +349,24 @@ def section_a3_raw_scoring(md, ranked_base, ranked_potential, index_pe):
     md.append("### Potential Stock Raw Scores (all candidates)\n")
     md.append("**Formulas:**")
     md.append("- `future_growth_raw` = CAGR(net_incomes, years=2)")
-    md.append("- `momentum_raw` = ((current_price - oldest_price) / oldest_price) × 100")
-    md.append(f"- `valuation_raw` = (2 - (stock_pe / index_pe)) × 50, where **index_pe = {fmt_raw(index_pe)}**\n")
+    md.append("- `momentum_raw` = ((current_price - oldest_price) / oldest_price) × 100\n")
 
     scored_pot = [s for s in ranked_potential if s.potential_scores_detail]
 
-    md.append("| # | Symbol | future_growth | momentum | valuation | **Final Score** |")
-    md.append("|---|--------|--------------|----------|-----------|----------------|")
+    md.append("| # | Symbol | future_growth | momentum | **Final Score** |")
+    md.append("|---|--------|--------------|----------|----------------|")
     for i, stock in enumerate(scored_pot):
         d = stock.potential_scores_detail
         marker = " **←**" if stock.symbol == SAMPLE_POTENTIAL_SYMBOL else ""
-        md.append(f"| {i+1} | {stock.symbol}{marker} | {fmt_pct(d['future_growth_raw'])} | {fmt_pct(d['momentum_raw'])} | {fmt_raw(d['valuation_raw'])} | **{fmt_raw(stock.potential_score)}** |")
+        md.append(f"| {i+1} | {stock.symbol}{marker} | {fmt_pct(d['future_growth_raw'])} | {fmt_pct(d['momentum_raw'])} | **{fmt_raw(stock.potential_score)}** |")
 
     fg_vals = [s.potential_scores_detail['future_growth_raw'] for s in scored_pot]
     mom_vals = [s.potential_scores_detail['momentum_raw'] for s in scored_pot]
-    val_vals = [s.potential_scores_detail['valuation_raw'] for s in scored_pot]
     md.append(f"\n**Min/Max for normalization:**")
     md.append(f"| Metric | Min | Max |")
     md.append(f"|--------|-----|-----|")
     md.append(f"| future_growth | {fmt_pct(min(fg_vals))} | {fmt_pct(max(fg_vals))} |")
     md.append(f"| momentum | {fmt_pct(min(mom_vals))} | {fmt_pct(max(mom_vals))} |")
-    md.append(f"| valuation | {fmt_raw(min(val_vals))} | {fmt_raw(max(val_vals))} |")
     md.append("")
 
     return scored_base, scored_pot
@@ -643,22 +624,8 @@ def section_b(md, all_stocks):
     md.append("# Section B: Full-Build-Only Calculations\n")
     md.append("These calculations are used only in the full build path (`python build_fund.py --index SP500`).\n")
 
-    # B1: Index PE
-    md.append("## B1. Index P/E Ratio (from stock pool)\n")
-    md.append("**Source:** `build_fund.py` — Step 7\n")
-    md.append("The index P/E is computed as the arithmetic mean of all processed stocks' P/E ratios:\n")
-    md.append("```")
-    md.append("pe_values = [s.pe_ratio for s in all_stocks if s.pe_ratio and s.pe_ratio > 0]")
-    md.append("index_pe = sum(pe_values) / len(pe_values)")
-    md.append("```")
-    md.append("This is the **same method** used by the quarterly update path (see Section C6).")
-    md.append("Both SP500 and TASE125 use identical logic.\n")
-    md.append("This value is used in the potential stock valuation formula:")
-    md.append("```")
-    md.append("valuation_score = (2 - (stock_pe / index_pe)) × 50")
-    md.append("```")
-
-    # B2: Fiscal-Date Aligned Price History
+    # B1: Fiscal-Date Aligned Price History
+    md.append("## B1. Fiscal-Date Aligned Price History\n")
     md.append("## B2. Fiscal-Date Aligned Price History\n")
     md.append("**Source:** `build_fund.py:633-639`, `data_sources/twelvedata_api.py:~540`\n")
     md.append("In the full build, price history is fetched at specific **fiscal year-end dates** extracted from the financial data:")
@@ -680,8 +647,8 @@ def section_b(md, all_stocks):
     md.append("**Feb 2026 Fix:** The system extends fiscal dates to include the next completed FY-end,")
     md.append("even if financials haven't been filed yet. This ensures scoring uses current-year prices.\n")
 
-    # B3: Data Validation
-    md.append("## B3. Data Validation\n")
+    # B2: Data Validation
+    md.append("## B2. Data Validation\n")
     md.append("**Source:** `data_sources/adapter.py:19-76` (`validate_financial_data`), lines 78-120 (`validate_market_data`)\n")
     md.append("The full build path validates all fetched data. The quarterly update path does **not** run these checks.\n")
 
@@ -741,13 +708,10 @@ def section_c(md, nvda, all_stocks):
     # C3-C5: Quarterly Fetch + LTM (live API call)
     section_c3_c4_c5_ltm(md, nvda)
 
-    # C6: Index PE via Candidate Mean
-    section_c6_index_pe(md, all_stocks)
-
-    # C7: Eligibility Gating
+    # C6: Eligibility Gating
     section_c7_eligibility_gating(md)
 
-    # C8: Comparison
+    # C7: Comparison
     section_c8_comparison(md)
 
 
@@ -942,41 +906,6 @@ def section_c3_c4_c5_ltm(md, nvda):
         md.append("*Skipped — quarterly data not available.*\n")
 
 
-def section_c6_index_pe(md, all_stocks):
-    """C6: Index PE via Candidate Mean"""
-    md.append("## C6. Index P/E via Candidate Mean\n")
-    md.append("**Source:** `fund_builder/updater.py:202-203`\n")
-    md.append("In the quarterly update path, index P/E is computed as the **arithmetic mean** of all candidates' P/E ratios:\n")
-    md.append("```python")
-    md.append("pe_values = [s.pe_ratio for s in updated_stocks.values() if s.pe_ratio and s.pe_ratio > 0]")
-    md.append("index_pe = sum(pe_values) / len(pe_values)")
-    md.append("```\n")
-
-    pe_values = []
-    pe_samples = []
-    for symbol, stock in sorted(all_stocks.items()):
-        if stock.pe_ratio and stock.pe_ratio > 0:
-            pe_values.append(stock.pe_ratio)
-            if len(pe_samples) < 10:
-                pe_samples.append((stock.symbol, stock.pe_ratio))
-
-    if pe_values:
-        index_pe = sum(pe_values) / len(pe_values)
-        md.append(f"**Sample P/E values (first 10 of {len(pe_values)}):**")
-        md.append("| Symbol | P/E |")
-        md.append("|--------|-----|")
-        for sym, pe in pe_samples:
-            md.append(f"| {sym} | {fmt_raw(pe)} |")
-        md.append(f"\n```")
-        md.append(f"index_pe = sum({len(pe_values)} P/E values) / {len(pe_values)} = {fmt_raw(index_pe)}")
-        md.append(f"```\n")
-        md.append(f"**Note:** Both full build and quarterly update use the same method — mean of stock pool P/E ratios.\n")
-    else:
-        md.append("*No valid P/E data available.*\n")
-
-    return sum(pe_values) / len(pe_values) if pe_values else None
-
-
 def section_c7_eligibility_gating(md):
     """C7: Eligibility Gating by Previous Category"""
     md.append("## C7. Eligibility Gating by Previous Category\n")
@@ -1075,13 +1004,9 @@ def main():
         if stock and symbol not in base_syms_set and stock.check_potential_eligibility():
             potential_eligible.append(stock)
 
-    # Compute index_pe from candidate pool (update path method)
-    pe_values = [s.pe_ratio for s in all_stocks.values() if s.pe_ratio and s.pe_ratio > 0]
-    index_pe = sum(pe_values) / len(pe_values) if pe_values else 30.0
-
     # Score and rank
     ranked_base = builder.score_and_rank_base_stocks(base_eligible)
-    ranked_potential = builder.score_and_rank_potential_stocks(potential_eligible, index_pe)
+    ranked_potential = builder.score_and_rank_potential_stocks(potential_eligible)
 
     # Select with duplicate filtering
     selected_base = select_stocks_skip_duplicates(ranked_base, 6)
@@ -1114,7 +1039,7 @@ def main():
     # Section A
     section_a1_data_level_metrics(md, nvda, mu)
     section_a2_eligibility(md, nvda, mu)
-    scored_base, scored_pot = section_a3_raw_scoring(md, ranked_base, ranked_potential, index_pe)
+    scored_base, scored_pot = section_a3_raw_scoring(md, ranked_base, ranked_potential)
     section_a4_normalization(md, scored_base, scored_pot, builder)
     section_a5_final_scores(md, scored_base, scored_pot)
     section_a6_duplicate_filtering(md, ranked_base)

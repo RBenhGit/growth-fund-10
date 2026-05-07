@@ -29,6 +29,7 @@ from utils.date_utils import (
     get_current_date_string,
 )
 from data_sources.adapter import DataSourceAdapter as adapter
+from utils.deploy import deploy_fund_docs
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -198,17 +199,13 @@ class QuarterlyUpdater:
         ranked_base = self.builder.score_and_rank_base_stocks(base_eligible)
         console.print(f"  [green]✓[/green] דורגו {len(ranked_base)} מניות בסיס")
 
-        # Calculate index P/E for potential scoring
-        pe_values = [s.pe_ratio for s in updated_stocks.values() if s.pe_ratio and s.pe_ratio > 0]
-        index_pe = sum(pe_values) / len(pe_values) if pe_values else None
-
         # Remove base-selected stocks from potential pool
         from utils.dedup import select_stocks_skip_duplicates
         selected_base = select_stocks_skip_duplicates(ranked_base, 6)
         selected_base_symbols = {s.symbol for s in selected_base}
 
         potential_pool = [s for s in potential_eligible if s.symbol not in selected_base_symbols]
-        ranked_potential = self.builder.score_and_rank_potential_stocks(potential_pool, index_pe)
+        ranked_potential = self.builder.score_and_rank_potential_stocks(potential_pool)
         console.print(f"  [green]✓[/green] דורגו {len(ranked_potential)} מניות פוטנציאל")
 
         selected_potential = select_stocks_skip_duplicates(ranked_potential, 4)
@@ -434,3 +431,6 @@ class QuarterlyUpdater:
         )
 
         logger.info(f"Saved update documents to {self.output_dir}")
+
+        # Deploy to Google Drive (if configured)
+        deploy_fund_docs(self.output_dir)

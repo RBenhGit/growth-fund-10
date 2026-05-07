@@ -19,11 +19,15 @@ from datetime import datetime
 import time
 import json
 
-# Fix Windows console encoding for Hebrew
-if sys.platform == "win32":
+# Fix Windows console encoding for Hebrew (only on first import)
+if sys.platform == "win32" and not hasattr(sys.stdout, "_original_encoding_fixed"):
     import codecs
-    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
+    import io
+    # Only wrap if stdout is still a TextIOWrapper with a buffer attribute
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer)
+        sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer)
+    sys.stdout._original_encoding_fixed = True
     os.environ["PYTHONIOENCODING"] = "utf-8"
 
 # הוספת התיקייה הנוכחית ל-path
@@ -35,7 +39,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from config import settings
 from utils.date_utils import get_quarter_and_year, format_fund_name, get_current_date_string, get_fund_output_dir
+from utils.deploy import deploy_fund_docs
 
+# Configure logging after stdout fix to avoid stream detachment errors
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[logging.StreamHandler(sys.stderr)]
+)
 logger = logging.getLogger(__name__)
 
 # יצירת console עבור פלט יפה
@@ -770,11 +781,7 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
         # ===== שלב 7: חישוב ציון פוטנציאל =====
         task7 = progress.add_task("[cyan]שלב 7: חישוב ציון פוטנציאל...", total=None)
         try:
-            # Calculate index P/E from actual stock data (same method as quarterly update)
-            pe_values = [s.pe_ratio for s in builder.all_stocks if s.pe_ratio and s.pe_ratio > 0]
-            index_pe = sum(pe_values) / len(pe_values) if pe_values else None
-            logger.info(f"Step 7: Calculated index P/E from {len(pe_values)} stocks: {index_pe}")
-            ranked_potential = builder.score_and_rank_potential_stocks(builder.potential_candidates, index_pe)
+            ranked_potential = builder.score_and_rank_potential_stocks(builder.potential_candidates)
 
             # עדכון cache עם ציונים
             logger.info(f"Step 7: Updating cache for {len(ranked_potential)} potential stocks...")
@@ -973,6 +980,9 @@ def build_fund(index_name: str, quarter: str, year: int, use_cache: bool):
 
     console.print("[green]✓[/green] בניית קרן הושלמה בהצלחה!")
     console.print(f"[yellow]מסמכים נשמרו ב:[/yellow] {output_dir}")
+
+    # ===== Deploy to Google Drive (if configured) =====
+    deploy_fund_docs(output_dir)
 
 
 def main():

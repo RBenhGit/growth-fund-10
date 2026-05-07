@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-04-29T04:31:55.363262",
+  "index": "SP500",
+  "quarter": "Q2",
+  "year": 2026,
+  "total_constituents": 503,
+  "loaded": 487,
+  "failed": 13,
+  "failures": {
+    "not_found": [],
+    "api_error": [],
+    "financial_validation": [
+      {
+        "symbol": "PSKY.US",
+        "name": "Paramount Skydance Corporation Class B Common Stock",
+        "reason": "Invalid financial data (see logs for details)"
+      }
+    ],
+    "pricing_validation": [
+      {
+        "symbol": "MMC.US",
+        "name": "Marsh & McLennan Companies Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "CEG.US",
+        "name": "Constellation Energy Corp",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "GEHC.US",
+        "name": "GE HealthCare Technologies Inc.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "KVUE.US",
+        "name": "Kenvue Inc.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "VLTO.US",
+        "name": "Veralto Corporation",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SOLV.US",
+        "name": "Solventum Corp.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "GEV.US",
+        "name": "GE Vernova LLC",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "EXE.US",
+        "name": "Expand Energy Corporation",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SNDK.US",
+        "name": "Sandisk Corp",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "SOLS.US",
+        "name": "Solstice Advanced Materials, Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "Q.US",
+        "name": "Qnity Electronics, Inc",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "FISV.US",
+        "name": "Fiserv, Inc. Common Stock",
+        "reason": "Invalid pricing data (see logs for details)"
+      }
+    ]
+  }
+}

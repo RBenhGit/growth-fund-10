@@ -187,29 +187,27 @@ class FundBuilder:
             "market_cap": market_cap_score
         }
 
-    def calculate_potential_score(self, stock: Stock, index_pe: Optional[float] = None) -> Dict[str, float]:
+    def calculate_potential_score(self, stock: Stock) -> Dict[str, float]:
         """
         חישוב ציון מניית פוטנציאל
 
         משקולות:
-        - צמיחה עתידית: 50%
-        - מומנטום: 30%
-        - שווי: 20%
+        - צמיחה עתידית (CAGR 2 שנים): 80%
+        - מומנטום: 20%
 
         Args:
             stock: מניה
-            index_pe: P/E ממוצע של המדד
 
         Returns:
             Dict[str, float]: ציונים עבור כל קריטריון
         """
         if not stock.financial_data or not stock.market_data:
-            return {"future_growth": 0.0, "momentum": 0.0, "valuation": 0.0}
+            return {"future_growth": 0.0, "momentum": 0.0}
 
         # צמיחה עתידית (3 נקודות נתונים → CAGR של 2 שנים, מונע עיוות מאירועים חד-פעמיים)
         future_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 3) or 0.0
 
-        # מומנטום (שינוי מחיר בשנה האחרונה)
+        # מומנטום (שינוי מחיר מאז הנתון ההיסטורי הישן ביותר הזמין)
         momentum_raw = stock.market_data.calculate_momentum(365)
         if momentum_raw is None:
             logger.debug(f"{stock.symbol}: No price history - momentum will use default (0.0)")
@@ -217,22 +215,9 @@ class FundBuilder:
         else:
             momentum = momentum_raw
 
-        # שווי (P/E יחסי למדד)
-        valuation_score = 0.0
-        if stock.pe_ratio and index_pe and index_pe > 0:
-            # ציון גבוה יותר למניות עם P/E נמוך יחסית למדד
-            relative_pe = stock.pe_ratio / index_pe
-            valuation_score = (2 - relative_pe) * 50  # נרמול לטווח 0-100
-        else:
-            if not stock.pe_ratio:
-                logger.debug(f"{stock.symbol}: Missing P/E ratio - valuation will use default (0.0)")
-            elif not index_pe or index_pe <= 0:
-                logger.debug(f"{stock.symbol}: Invalid index P/E ({index_pe}) - valuation will use default (0.0)")
-
         return {
             "future_growth": future_growth,
             "momentum": momentum,
-            "valuation": valuation_score
         }
 
     def score_and_rank_base_stocks(self, stocks: List[Stock]) -> List[Stock]:
@@ -307,16 +292,15 @@ class FundBuilder:
         scored_stocks.sort(key=lambda s: s.base_score or 0, reverse=True)
         return scored_stocks
 
-    def score_and_rank_potential_stocks(self, stocks: List[Stock], index_pe: Optional[float]) -> List[Stock]:
+    def score_and_rank_potential_stocks(self, stocks: List[Stock]) -> List[Stock]:
         """
         ציון ודירוג מניות פוטנציאל (growth-focused, no stability blend)
 
         Final potential score:
-          potential_score = 0.70 × FutureGrowth_rank + 0.20 × Momentum_rank + 0.10 × Valuation_rank
+          potential_score = 0.80 × FutureGrowth_rank + 0.20 × Momentum_rank
 
         Args:
             stocks: רשימת מניות
-            index_pe: P/E ממוצע של המדד
 
         Returns:
             List[Stock]: מניות ממוינות לפי ציון
@@ -324,22 +308,20 @@ class FundBuilder:
         scored_stocks = []
 
         for stock in stocks:
-            scores = self.calculate_potential_score(stock, index_pe)
+            scores = self.calculate_potential_score(stock)
             if scores:
                 stock._raw_scores = scores
                 scored_stocks.append(stock)
 
         # Rank-percentile normalization for each component
         if scored_stocks:
-            growth_ranks    = self.rank_percentile([s._raw_scores["future_growth"] for s in scored_stocks])
-            momentum_ranks  = self.rank_percentile([s._raw_scores["momentum"] for s in scored_stocks])
-            valuation_ranks = self.rank_percentile([s._raw_scores["valuation"] for s in scored_stocks])
+            growth_ranks   = self.rank_percentile([s._raw_scores["future_growth"] for s in scored_stocks])
+            momentum_ranks = self.rank_percentile([s._raw_scores["momentum"] for s in scored_stocks])
 
             for i, stock in enumerate(scored_stocks):
                 final_score = (
                     settings.POTENTIAL_SCORE_WEIGHTS["future_growth"] * growth_ranks[i] +
-                    settings.POTENTIAL_SCORE_WEIGHTS["momentum"] * momentum_ranks[i] +
-                    settings.POTENTIAL_SCORE_WEIGHTS["valuation"] * valuation_ranks[i]
+                    settings.POTENTIAL_SCORE_WEIGHTS["momentum"] * momentum_ranks[i]
                 )
                 stock.potential_score = final_score
 
@@ -347,10 +329,8 @@ class FundBuilder:
                 stock.potential_scores_detail = {
                     "future_growth_raw": stock._raw_scores["future_growth"],
                     "momentum_raw": stock._raw_scores["momentum"],
-                    "valuation_raw": stock._raw_scores["valuation"],
                     "growth_rank": growth_ranks[i],
                     "momentum_rank": momentum_ranks[i],
-                    "valuation_rank": valuation_ranks[i]
                 }
 
                 # Verify assignment

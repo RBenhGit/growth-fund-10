@@ -95,6 +95,15 @@ class Settings:
     USE_CACHE = os.getenv("USE_CACHE", "true").lower() == "true"
     DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
+    # Google Drive deployment path (optional)
+    # Set to the local path where Google Drive for Desktop mounts your target folder.
+    # Example: C:\Users\ranbe\My Drive\Fund_10
+    GOOGLE_DRIVE_DEPLOY_PATH: Optional[Path] = (
+        Path(os.getenv("GOOGLE_DRIVE_DEPLOY_PATH"))
+        if os.getenv("GOOGLE_DRIVE_DEPLOY_PATH")
+        else None
+    )
+
     # משקלות קרן (קבועים) - 10 מניות: 6 בסיס + 4 פוטנציאל
     FUND_WEIGHTS = [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
 
@@ -111,11 +120,12 @@ class Settings:
     # משקל היציבות בתוך כל ציר צמיחה (0.7 CAGR + 0.3 stability)
     STABILITY_BLEND = 0.30
 
-    # משקלות לחישוב ציון פוטנציאל (growth-focused: 70% growth, 20% momentum, 10% valuation)
+    # משקלות לחישוב ציון פוטנציאל (growth-focused: 80% growth, 20% momentum)
+    # PE/valuation removed: high-growth stocks naturally carry high PE premiums,
+    # so penalizing PE systematically disadvantages the stocks this model targets.
     POTENTIAL_SCORE_WEIGHTS = {
-        "future_growth": 0.70,
+        "future_growth": 0.80,
         "momentum": 0.20,
-        "valuation": 0.10
     }
 
     # קריטריוני סינון מניות בסיס

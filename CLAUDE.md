@@ -332,9 +332,10 @@ BASE_SCORE_WEIGHTS = {
 }
 STABILITY_BLEND = 0.30                      # Weight of R² in blended sub-score
 POTENTIAL_SCORE_WEIGHTS = {
-    "future_growth": 0.70,                  # growth-first: 70%
+    "future_growth": 0.80,                  # growth-first: 80%
     "momentum": 0.20,
-    "valuation": 0.10
+    # valuation (PE) removed: high-growth stocks naturally carry high PE premiums,
+    # penalizing PE systematically disadvantages the stocks this model targets.
 }
 ```
 
@@ -373,12 +374,13 @@ base_score  = 0.40 × NI_blended + 0.35 × Rev_blended + 0.25 × MarketCap_perce
 ```
 The 30% R² weight ensures **long-term consistent compounders are preferred**: two stocks with identical CAGR but different volatility patterns will score differently (steady grower scores higher). This penalizes boom-bust patterns and rewards steady geometric growth.
 
-**Potential stock final score (growth-maximizing, no stability blend):**
+**Potential stock final score (growth-maximizing, no stability blend, no valuation):**
 ```
-potential_score = 0.70 × FutureGrowth_percentile
+potential_score = 0.80 × FutureGrowth_percentile
                + 0.20 × Momentum_percentile
-               + 0.10 × Valuation_percentile
 ```
+PE/valuation is excluded from potential scoring: high-growth stocks naturally command PE premiums,
+so penalizing PE would systematically disadvantage the stocks this model is designed to select.
 
 ## Algorithm Consistency
 

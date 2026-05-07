@@ -46,9 +46,10 @@ Each stock is scored using a **blended growth-stability model**:
 
 **Potential Stocks (High Growth):**
 Growth-focused ranking (no stability blend):
-- **Future Growth**: 70% (3-year CAGR)
+- **Future Growth**: 80% (3-year CAGR)
 - **Momentum**: 20% (1-year price change)
-- **Valuation**: 10% (relative P/E)
+
+*(PE/Valuation excluded — high-growth stocks naturally carry PE premiums; penalizing P/E would systematically disadvantage the stocks this model targets)*
 
 All metrics use **rank-percentile normalization** (0–100 scale, distribution-agnostic).
 
@@ -343,7 +344,14 @@ Tests:
 │   ├── update_parser.py       # Parse _Update.md for candidates
 │   ├── cache_loader.py        # Load Stock objects from cache
 │   ├── ltm_calculator.py      # LTM calculation & merging
-│   └── changelog.py           # CHANGELOG.md management
+│   ├── changelog.py           # CHANGELOG.md management
+│   ├── dedup.py               # Company deduplication (multi-class share filtering)
+│   └── deploy.py              # Google Drive deployment: copies .md files after each build
+├── tools/
+│   └── demonstrate_calculations.py  # Step-by-step scoring formula demo
+├── scripts/
+│   ├── run_fund.ps1           # Execution wrapper (called by scheduled tasks)
+│   └── schedule_tasks.ps1     # Task registration (run as Admin one-time to set up)
 ├── tests/                     # Test suite
 │   ├── test_all_sources.py
 │   ├── test_quarterly_update.py
@@ -509,4 +517,4 @@ Private research project. Not for distribution or commercial use.
 
 **Made with ❤️ for systematic investing**
 
-*Last updated: April 2026*
+*Last updated: May 2026*

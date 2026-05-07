@@ -186,6 +186,7 @@ Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -
   - `get_fund_output_dir()` - Returns `Fund_Docs/{INDEX}/{Q}_{YEAR}/` path
   - `find_latest_fund_dir()` - Scans for most recent quarter folder
   - `find_previous_fund_dir()` - Finds the quarter folder before the current one
+- [utils/deploy.py](utils/deploy.py) - Copies generated `.md` files to a Google Drive local mount after each build or update. Silently skipped if `GOOGLE_DRIVE_DEPLOY_PATH` is not set in `.env`. Called by both `build_fund.py` and `fund_builder/updater.py`.
 
 **Scheduling & Automation (Windows Task Scheduler):**
 - [scripts/run_fund.ps1](scripts/run_fund.ps1) - PowerShell wrapper that executes fund builds/updates
@@ -226,6 +227,7 @@ Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -
 │   ├── ltm_calculator.py       # LTM calculation & merging
 │   ├── changelog.py            # CHANGELOG.md management
 │   ├── dedup.py                # Company deduplication: skip multi-class shares
+│   ├── deploy.py               # Google Drive deployment: copies .md files after each build
 │   └── migrate_fund_docs.py    # One-time folder migration
 ├── scripts/
 │   ├── run_fund.ps1            # Execution wrapper (called by scheduled tasks)
@@ -644,6 +646,13 @@ FUND_YEAR=     # Auto-detected if blank
 OUTPUT_DIRECTORY=./Fund_Docs
 USE_CACHE=true
 DEBUG_MODE=false
+
+# ====================================================================
+# Google Drive Deployment (optional)
+# ====================================================================
+GOOGLE_DRIVE_DEPLOY_PATH=  # Local Google Drive path, e.g. C:\Users\ranbe\My Drive\Fund_10
+                           # If set, .md files are copied here after every build/update
+                           # Silently skipped if not configured
 ```
 
 ### Legacy Configuration (Backwards Compatible)

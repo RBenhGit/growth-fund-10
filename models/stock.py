@@ -24,7 +24,7 @@ class Stock(BaseModel):
 
     # ציונים משנה (פירוט)
     base_scores_detail: Optional[dict] = Field(None, description="פירוט ציוני בסיס: net_income_growth, revenue_growth, market_cap")
-    potential_scores_detail: Optional[dict] = Field(None, description="פירוט ציוני פוטנציאל: future_growth, momentum, valuation")
+    potential_scores_detail: Optional[dict] = Field(None, description="פירוט ציוני פוטנציאל: future_growth, momentum")
 
     # מטא-נתונים
     is_eligible_for_base: bool = Field(False, description="כשירה כמניית בסיס")

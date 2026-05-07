@@ -1,7 +1,7 @@
 # השוואה רבעונית — Fund_10_SP500_Q2_2026
 
 עדכון מ: Fund_10_SP500_Q2_2026 (2026-05-04)
-עדכון ל: Fund_10_SP500_Q2_2026 (2026-05-04)
+עדכון ל: Fund_10_SP500_Q2_2026 (2026-05-07)
 
 ## סיכום שינויים
 
@@ -14,13 +14,13 @@
 
 | סימול | שם | משקל קודם | משקל חדש | ציון קודם | ציון חדש | שינוי |
 |-------|-----|-----------|----------|-----------|---------|-------|
-| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 86.86 | 86.86 | → |
-| ANET.US | Arista Networks | 16.0% | 16.0% | 82.17 | 82.17 | → |
-| NOW.US | ServiceNow Inc | 16.0% | 16.0% | 70.12 | 70.12 | → |
-| BKNG.US | Booking Holdings Inc | 10.0% | 10.0% | 68.50 | 68.50 | → |
-| HWM.US | Howmet Aerospace Inc | 10.0% | 10.0% | 66.22 | 66.22 | → |
-| WELL.US | Welltower Inc | 10.0% | 10.0% | 63.33 | 63.33 | → |
-| APP.US | Applovin Corp | 6.0% | 6.0% | 86.47 | 86.47 | → |
-| PLTR.US | Palantir Technologies Inc. | 6.0% | 6.0% | 81.76 | 81.76 | → |
-| MRK.US | Merck & Company Inc | 4.0% | 4.0% | 74.12 | 74.12 | → |
-| LLY.US | Eli Lilly and Company | 4.0% | 4.0% | 69.41 | 69.41 | → |
+| NVDA.US | NVIDIA Corporation | 18.0% | 18.0% | 86.86 | 86.50 | → |
+| ANET.US | Arista Networks | 16.0% | 16.0% | 82.17 | 80.95 | → |
+| NOW.US | ServiceNow Inc | 16.0% | 16.0% | 70.12 | 69.26 | → |
+| BKNG.US | Booking Holdings Inc | 10.0% | 10.0% | 68.50 | 68.14 | → |
+| HWM.US | Howmet Aerospace Inc | 10.0% | 10.0% | 66.22 | 65.88 | → |
+| WELL.US | Welltower Inc | 10.0% | 10.0% | 63.33 | 62.10 | → |
+| APP.US | Applovin Corp | 6.0% | 6.0% | 86.47 | 92.94 | → |
+| PLTR.US | Palantir Technologies Inc. | 6.0% | 6.0% | 81.76 | 90.59 | → |
+| MRK.US | Merck & Company Inc | 4.0% | 4.0% | 74.12 | 81.18 | → |
+| LLY.US | Eli Lilly and Company | 4.0% | 4.0% | 69.41 | 74.12 | → |

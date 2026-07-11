@@ -87,11 +87,13 @@ class Fund(BaseModel):
 
     def get_base_positions(self) -> List[FundPosition]:
         """מחזיר את מניות הבסיס"""
-        return [p for p in self.positions if p.position_type == "base"]
+        # הפוזיציות נוצרות עם תוויות עבריות ("בסיס"/"פוטנציאל") לכל אורך הבנייה
+        # והעדכון; נתמכות גם התוויות האנגליות לתאימות לאחור.
+        return [p for p in self.positions if p.position_type in ("בסיס", "base")]
 
     def get_potential_positions(self) -> List[FundPosition]:
         """מחזיר את מניות הפוטנציאל"""
-        return [p for p in self.positions if p.position_type == "potential"]
+        return [p for p in self.positions if p.position_type in ("פוטנציאל", "potential")]
 
     def calculate_total_value_per_unit(self) -> float:
         """חישוב ערך כולל ליחידת קרן"""

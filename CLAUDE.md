@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **Growth Fund Builder (מערכת בניית קרן צמיחה 10)** - an automated system for building and managing investment portfolios based on stock indices. The system analyzes stocks from either the TA-125 (Israeli) or S&P500 (US) indices, scores them using multiple financial criteria, and constructs optimized portfolios.
 
-The fund consists of:
-- **6 base stocks**: Established companies with 5+ years of proven profitability
-- **4 potential stocks**: High-growth candidates with 3+ years of profitability
+The fund consists of two sleeves with deliberately different mandates:
+- **6 base stocks (80% of capital)** — the *"Quality Growth at Scale"* sleeve: established, large companies with 5+ years of proven profitability. Their score blends growth **CAGR with R² stability** and rewards size (market-cap rank), so this sleeve intentionally selects steady large-cap compounders rather than the fastest growers. It is a quality/scale-tilted growth sleeve, not a pure growth sleeve.
+- **4 potential stocks (20% of capital)** — the pure-growth sleeve: candidates with 3+ years of profitability scored on growth and momentum only (no stability blend, no valuation penalty).
+
+This split is by design: most of the fund is anchored in durable large-cap compounders, with a smaller high-growth satellite.
 
 ## Commands
 
@@ -273,9 +275,9 @@ The system follows a 14-step process:
 5. **Prepare Potential List** - Remove base stocks from index constituents
 6. **Filter Potential Stocks** - Relaxed criteria (3 years profitability)
 7. **Score Potential Candidates** - Growth-focused model (no stability blend):
-   - Future growth potential: 70%
-   - Momentum: 20%
-   - Valuation: 10%
+   - Future growth: 80% (historical 2-year net-income CAGR over 3 data points — a backward-looking growth proxy, not a forecast)
+   - Momentum: 20% (see momentum definition below)
+   - Valuation (PE) is intentionally excluded — high-growth stocks carry PE premiums, so penalizing PE would disadvantage exactly the stocks this sleeve targets
 8. **Select Top 4 Potential Stocks**
 9. **Assign Fixed Weights** - 18%, 16%, 16%, 10%, 10%, 10%, 6%, 6%, 4%, 4%
 10. **Calculate Minimum Fund Cost** - Ensure whole share numbers per fund unit
@@ -293,7 +295,7 @@ The `--update` flag runs a lighter rebalancing instead of a full 500+ stock rebu
 3. **Load Cached Stocks** — Reads full `Stock` objects from `cache/stocks_data/*.json`
 4. **Fetch Quarterly Data** — Calls TwelveData with `period=quarterly` for 4 quarters
 5. **Calculate LTM** — Sums last 4 quarters: revenue, net income, operating income, cash flow
-6. **Merge LTM into Stocks** — Adds LTM year to financial history, refreshes pricing via yfinance
+6. **Merge LTM into Stocks** — Writes the LTM values **over the most recent annual slot** (it does *not* append a new year), refreshes pricing via yfinance. Overwriting keeps the CAGR/R² window at a fixed 5 points so scores don't swing on a pure date-window shift. Debt/equity are only overwritten when the quarterly balance sheet actually returns them; otherwise the cached annual values are preserved. Note: this means the re-saved cache files for fund holdings hold LTM-adjusted figures in the latest annual slot, not the raw annual report.
 7. **Re-check Eligibility** — Applies same base/potential criteria
 8. **Re-score and Rank** — Uses identical scoring weights as full build
 9. **Build Fund** — Select 6 base + 4 potential, assign weights, calculate minimum cost
@@ -381,14 +383,21 @@ The 30% R² weight ensures **long-term consistent compounders are preferred**: t
 potential_score = 0.80 × FutureGrowth_percentile
                + 0.20 × Momentum_percentile
 ```
-PE/valuation is excluded from potential scoring: high-growth stocks naturally command PE premiums,
-so penalizing PE would systematically disadvantage the stocks this model is designed to select.
+- `FutureGrowth` is the **historical** 2-year net-income CAGR (3 data points). Despite the name it is backward-looking, not a forecast, and — because CAGR is endpoint-only — a one-time item in the first or last year moves it fully.
+- PE/valuation is excluded from potential scoring: high-growth stocks naturally command PE premiums, so penalizing PE would systematically disadvantage the stocks this model is designed to select.
+
+**Momentum (implemented in [models/financial_data.py](models/financial_data.py) `calculate_momentum`):**
+```
+momentum = (current_price / ref_price − 1) × 100
+ref_price = the price snapshot whose date is closest to (latest_snapshot_date − days_ago)
+```
+`days_ago` defaults to 365, giving a **consistent ~12-month window across all stocks**. The window is anchored to the most recent snapshot date (deterministic, independent of the run clock), not to "since the oldest price on file" — the latter varied per stock with the length of available history and overlapped the growth factor. Returns `None` with fewer than 2 dated price points (coerced to 0.0 in scoring).
 
 ## Algorithm Consistency
 
 The fund building algorithm treats **SP500 and TASE125 stocks identically**:
 
-- **Same eligibility criteria**: 5 years profitability for base, 2 years for potential
+- **Same eligibility criteria**: 5 years profitability for base (plus 5 years of revenue history, positive cash flow, non-negative equity, debt/equity < 60%), 3 years profitability for potential
 - **Same scoring weights**: 40% net income, 35% revenue, 25% market cap
 - **Same fund weights**: [0.18, 0.16, 0.16, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.04]
 - **Same validation rules**: Strict validation for all stocks (require valid prices, 5+ price history points)
@@ -574,13 +583,17 @@ TWELVEDATA_API_KEY=your-key-here
 
 Base stocks must meet ALL criteria (implemented in [models/stock.py](models/stock.py:67-105)):
 - 5+ years of positive net income (consecutive)
+- 5+ years of revenue history (required so the revenue-growth CAGR in scoring is real, not a placeholder 0.0)
 - 4 out of 5 years with positive operating income
 - Positive cash flow in majority of years
+- Non-negative equity (negative/zero equity is rejected explicitly, because `debt_to_equity_ratio` returns `None` in that case and would otherwise pass the debt gate silently)
 - Debt-to-equity ratio < 60%
 
 Potential stocks have relaxed criteria:
 - 3+ years of positive net income (most recent, consecutive)
 - Complete growth data for 3 years (required for 2-year CAGR calculation)
+
+**Eligibility is re-evaluated, not just granted.** `check_base_eligibility()` / `check_potential_eligibility()` reset their `is_eligible_*` flag to `False` at the top of each call before re-testing. This matters for the quarterly update, which re-checks `Stock` objects loaded from cache that were already flagged eligible: a holding whose refreshed LTM data now fails a criterion (e.g. a net loss, or debt/equity breaching 60%) correctly loses eligibility instead of being grandfathered in until the next full rebuild.
 
 ### Cache System
 

@@ -14,7 +14,7 @@ import os
 import json
 import codecs
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Windows console encoding fix
 if sys.platform == "win32":
@@ -186,13 +186,17 @@ def section_a1_data_level_metrics(md, nvda, mu):
 
     # --- Momentum (MU) ---
     md.append("### Momentum (MU)\n")
-    md.append(f"**Formula:** `momentum = ((current_price - oldest_price) / oldest_price) × 100`")
-    md.append(f"**Source:** `models/financial_data.py:136-155`\n")
+    md.append(f"**Formula:** `momentum = ((current_price - ref_price) / ref_price) × 100`")
+    md.append(f"where `ref_price` is the snapshot whose date is closest to (latest_date − 365 days),")
+    md.append(f"giving a consistent ~12-month window across stocks rather than a since-oldest return.")
+    md.append(f"**Source:** `models/financial_data.py:calculate_momentum`\n")
 
     ph = mu.market_data.price_history
-    sorted_dates = sorted(ph.keys(), reverse=True)
-    oldest_date = sorted_dates[-1]
-    oldest_price = ph[oldest_date]
+    parsed = sorted((datetime.strptime(d, "%Y-%m-%d"), d) for d in ph.keys())
+    latest_dt, latest_date = parsed[-1]
+    target = latest_dt - timedelta(days=365)
+    ref_date = min(parsed, key=lambda pr: abs((pr[0] - target).days))[1]
+    ref_price = ph[ref_date]
     current_price_mu = mu.market_data.current_price
     momentum = mu.market_data.calculate_momentum(365)
 
@@ -202,11 +206,12 @@ def section_a1_data_level_metrics(md, nvda, mu):
     for d in sorted(ph.keys()):
         md.append(f"| {d} | ${ph[d]:,.2f} |")
 
-    md.append(f"\n**Oldest entry:** {oldest_date} → ${oldest_price:,.2f}")
+    md.append(f"\n**Latest snapshot:** {latest_date}  |  **Lookback target:** {target.strftime('%Y-%m-%d')}")
+    md.append(f"**Reference entry (closest to target):** {ref_date} → ${ref_price:,.2f}")
     md.append(f"**Current price:** ${current_price_mu:,.2f}")
     md.append(f"\n```")
-    md.append(f"momentum = (({current_price_mu:,.2f} - {oldest_price:,.2f}) / {oldest_price:,.2f}) × 100")
-    md.append(f"         = ({current_price_mu - oldest_price:,.2f} / {oldest_price:,.2f}) × 100")
+    md.append(f"momentum = (({current_price_mu:,.2f} - {ref_price:,.2f}) / {ref_price:,.2f}) × 100")
+    md.append(f"         = ({current_price_mu - ref_price:,.2f} / {ref_price:,.2f}) × 100")
     md.append(f"         = {fmt_pct(momentum)}")
     md.append(f"```\n")
 
@@ -349,7 +354,8 @@ def section_a3_raw_scoring(md, ranked_base, ranked_potential):
     md.append("### Potential Stock Raw Scores (all candidates)\n")
     md.append("**Formulas:**")
     md.append("- `future_growth_raw` = CAGR(net_incomes, years=2)")
-    md.append("- `momentum_raw` = ((current_price - oldest_price) / oldest_price) × 100\n")
+    md.append("- `momentum_raw` = ((current_price - ref_price) / ref_price) × 100, "
+              "ref_price = snapshot closest to (latest_date − 365 days)\n")
 
     scored_pot = [s for s in ranked_potential if s.potential_scores_detail]
 

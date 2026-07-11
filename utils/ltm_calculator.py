@@ -60,8 +60,12 @@ def calculate_ltm(quarterly_data: dict) -> dict:
         "ltm_net_income": _sum_quarters(net_incomes),
         "ltm_operating_income": _sum_quarters(operating_incomes),
         "ltm_operating_cash_flow": _sum_quarters(cash_flows),
-        "total_debt": quarterly_data.get("total_debt", 0.0),
-        "total_equity": quarterly_data.get("total_equity", 0.0),
+        # None (not 0.0) when the quarterly balance sheet is missing these, so the
+        # merge step can preserve the cached annual values instead of zeroing them.
+        # Zeroing would make debt_to_equity_ratio return None and let a leveraged
+        # stock pass the debt criterion vacuously.
+        "total_debt": quarterly_data.get("total_debt"),
+        "total_equity": quarterly_data.get("total_equity"),
         "ltm_year": ltm_year,
         "quarters_used": quarters_used,
         "fiscal_dates": fiscal_dates,
@@ -113,9 +117,13 @@ def merge_ltm_into_stock(
         fd.operating_incomes[target_year] = ltm_data["ltm_operating_income"]
         fd.operating_cash_flows[target_year] = ltm_data["ltm_operating_cash_flow"]
 
-        # Update debt/equity from latest quarterly balance sheet
-        fd.total_debt = ltm_data["total_debt"]
-        fd.total_equity = ltm_data["total_equity"]
+        # Update debt/equity from latest quarterly balance sheet, but only when the
+        # quarterly fetch actually returned them. Otherwise keep the cached annual
+        # values — overwriting with 0.0 would silently erase real leverage data.
+        if ltm_data.get("total_debt") is not None:
+            fd.total_debt = ltm_data["total_debt"]
+        if ltm_data.get("total_equity") is not None:
+            fd.total_equity = ltm_data["total_equity"]
 
         logger.debug(
             f"{stock.symbol}: LTM {ltm_year} stored under year slot {target_year} — "

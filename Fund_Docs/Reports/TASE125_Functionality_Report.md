@@ -1,5 +1,16 @@
 # Growth Fund Builder - TASE125 Functionality Report
 
+> ⚠️ **HISTORICAL / SUPERSEDED SNAPSHOT — do not treat as current behavior.**
+> This is a point-in-time audit from **2026-02-01** describing an earlier version of the scoring
+> system. Several things it documents have since changed:
+> - **Potential scoring** was `growth 50% / momentum 30% / valuation 20%` here → now **`future_growth 80% / momentum 20%`**, valuation (PE) removed entirely.
+> - **Normalization** was **min-max** here → now **rank-percentile** (0–100).
+> - **Momentum** was "return since the oldest price on file" → now a **consistent ~12-month window** (price closest to latest snapshot − 365 days).
+> - Base eligibility now also requires 5 years of revenue history and non-negative equity.
+>
+> For **current** methodology see [CLAUDE.md](../../CLAUDE.md), [README.md](../../README.md), and the
+> `2026-07-10` entry in [CHANGELOG.md](../CHANGELOG.md). Retained only as a historical record.
+
 **Date:** 2026-02-01
 **Index:** TASE125 (Tel Aviv 125)
 **Analysis based on:** Cached run from 2025-12-19 (Q4 2025) + live execution attempt (Q1 2026)

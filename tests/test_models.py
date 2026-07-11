@@ -165,6 +165,16 @@ class TestMarketDataMomentum:
         md = make_market_data(price_history={"2024-01-01": 100.0})
         assert md.calculate_momentum() is None
 
+    def test_anchored_lookback_uses_one_year_price_not_oldest(self):
+        # 3 yearly snapshots. momentum(365) must use the ~1-year-ago snapshot
+        # (2024-06-30 = 100), NOT the oldest (2023-06-30 = 50).
+        # current 120 vs 100 → 20% (a since-oldest calc would give (120-50)/50 = 140%).
+        md = make_market_data(
+            current_price=120.0,
+            price_history={"2023-06-30": 50.0, "2024-06-30": 100.0, "2025-06-30": 115.0},
+        )
+        assert md.calculate_momentum(365) == pytest.approx(20.0)
+
 
 # ---------------------------------------------------------------------------
 # PricePoint
@@ -228,6 +238,32 @@ class TestCheckBaseEligibility:
         stock = make_stock(financial_data=fd)
         # debt_to_equity_ratio → 0.0 (no debt), should not fail on ratio check
         assert stock.check_base_eligibility() is True
+
+    def test_negative_equity_fails(self):
+        # Negative equity makes debt_to_equity_ratio return None (which would pass);
+        # the explicit solvency check must reject it.
+        fd = make_financial_data(total_debt=10.0, total_equity=-50.0)
+        stock = make_stock(financial_data=fd)
+        assert stock.check_base_eligibility() is False
+
+    def test_insufficient_revenue_history_fails(self):
+        # Only 2 revenue years → revenue CAGR would be a fake 0.0; reject at the gate.
+        fd = make_financial_data(revenues={2023: 120, 2024: 140})
+        stock = make_stock(financial_data=fd)
+        assert stock.check_base_eligibility() is False
+
+    def test_recheck_can_revoke_eligibility(self):
+        # A stock previously marked eligible (e.g. loaded from cache) must lose the
+        # flag when its refreshed data no longer qualifies — the ratchet-bug fix.
+        stock = make_stock(financial_data=make_financial_data(total_debt=30.0, total_equity=100.0))
+        assert stock.check_base_eligibility() is True
+        assert stock.is_eligible_for_base is True
+        # Latest year turns to a loss, breaking the 5-year profitability streak.
+        stock.financial_data = make_financial_data(
+            net_incomes={2020: 10, 2021: 12, 2022: 14, 2023: 16, 2024: -5}
+        )
+        assert stock.check_base_eligibility() is False
+        assert stock.is_eligible_for_base is False
 
 
 class TestCheckPotentialEligibility:
@@ -304,9 +340,10 @@ class TestFund:
         assert len(fund.positions) == 2
 
     def test_get_base_positions(self):
+        # Production creates positions with Hebrew type labels ("בסיס"/"פוטנציאל").
         fund = self._make_fund()
-        self._add_position(fund, 0.18, 100.0, "base")
-        self._add_position(fund, 0.06, 50.0, "potential")
+        self._add_position(fund, 0.18, 100.0, "בסיס")
+        self._add_position(fund, 0.06, 50.0, "פוטנציאל")
         assert len(fund.get_base_positions()) == 1
         assert len(fund.get_potential_positions()) == 1
 

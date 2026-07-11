@@ -305,6 +305,41 @@ class TestLTMCalculator:
         assert stock.base_score == 75.0
         assert stock.financial_data.total_debt == 10000
 
+    def test_merge_ltm_preserves_debt_equity_when_missing(self):
+        # When the quarterly balance sheet is absent, calculate_ltm yields None for
+        # debt/equity and the merge must keep the cached annual values — not zero them
+        # (zeroing would make debt_to_equity_ratio None and pass the debt gate blindly).
+        stock = Stock(
+            symbol="AAPL.US",
+            name="Apple Inc",
+            index="SP500",
+            financial_data=FinancialData(
+                symbol="AAPL.US",
+                revenues={2024: 380000, 2023: 370000, 2022: 360000},
+                net_incomes={2024: 95000, 2023: 90000, 2022: 85000},
+                operating_incomes={2024: 110000},
+                operating_cash_flows={2024: 100000},
+                total_debt=10000,
+                total_equity=200000,
+            ),
+        )
+        ltm_data = {
+            "ltm_revenue": 400000,
+            "ltm_net_income": 100000,
+            "ltm_operating_income": 120000,
+            "ltm_operating_cash_flow": 110000,
+            "total_debt": None,
+            "total_equity": None,
+            "ltm_year": 2025,
+            "quarters_used": 4,
+            "fiscal_dates": ["2025-12-31", "2025-09-30", "2025-06-30", "2025-03-31"],
+        }
+
+        updated = merge_ltm_into_stock(stock, ltm_data)
+
+        assert updated.financial_data.total_debt == 10000
+        assert updated.financial_data.total_equity == 200000
+
 
 # ==================== changelog tests ====================
 

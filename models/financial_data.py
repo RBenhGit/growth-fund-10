@@ -4,6 +4,7 @@
 
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, List
+from datetime import datetime, timedelta
 
 
 class FinancialData(BaseModel):
@@ -135,23 +136,41 @@ class MarketData(BaseModel):
 
     def calculate_momentum(self, days_ago: int = 365) -> Optional[float]:
         """
-        חישוב מומנטום - שינוי מחיר באחוזים
+        חישוב מומנטום - שינוי מחיר באחוזים על פני חלון קבוע (~days_ago ימים)
+
+        מעגן את החלון לתאריך התצפית האחרון בהיסטוריית המחירים (דטרמיניסטי, לא תלוי
+        בשעון הריצה) ומחפש את המחיר שתאריכו הקרוב ביותר ל-(תאריך אחרון − days_ago).
+        כך המומנטום מודד חלון עקבי בין כל המניות (למשל ~12 חודשים), במקום את התשואה
+        מאז הנקודה הישנה ביותר הזמינה — שאורכה משתנה ממניה למניה וחופף לגורם הצמיחה.
 
         Args:
-            days_ago: מספר ימים אחורה
+            days_ago: גודל חלון המומנטום בימים (ברירת מחדל: 365 ≈ שנה)
 
         Returns:
             Optional[float]: מומנטום באחוזים או None
         """
-        if not self.price_history:
+        if not self.price_history or self.current_price is None or self.current_price <= 0:
             return None
 
-        # למצוא את המחיר הכי קרוב לתאריך המבוקש
-        sorted_dates = sorted(self.price_history.keys(), reverse=True)
-        if len(sorted_dates) < 2:
+        def _parse(d: str) -> Optional[datetime]:
+            try:
+                return datetime.strptime(d, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                return None
+
+        parsed = sorted(
+            (dt, d) for d, dt in ((d, _parse(d)) for d in self.price_history.keys()) if dt is not None
+        )
+        if len(parsed) < 2:
             return None
 
-        old_price = self.price_history[sorted_dates[-1]]  # המחיר הכי ישן
+        latest_dt = parsed[-1][0]
+        target = latest_dt - timedelta(days=days_ago)
+
+        # המחיר שתאריכו הקרוב ביותר ל-target (חלון מומנטום עקבי)
+        ref_date = min(parsed, key=lambda pair: abs((pair[0] - target).days))[1]
+        old_price = self.price_history[ref_date]
+
         return ((self.current_price - old_price) / old_price) * 100 if old_price > 0 else None
 
 

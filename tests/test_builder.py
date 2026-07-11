@@ -178,7 +178,8 @@ class TestCalculatePotentialScore:
         assert isinstance(result, dict)
         assert "future_growth" in result
         assert "momentum" in result
-        assert "valuation" in result
+        # Valuation (PE) was intentionally removed from potential scoring; it must NOT reappear.
+        assert "valuation" not in result
 
     def test_no_data_returns_zeros(self):
         builder = make_builder()

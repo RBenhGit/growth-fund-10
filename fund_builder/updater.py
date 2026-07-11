@@ -182,12 +182,15 @@ class QuarterlyUpdater:
         base_symbols_from_prev = {s["symbol"] for s in prev_data["base_candidates"]}
 
         for symbol, stock in updated_stocks.items():
-            stock.check_base_eligibility()
-            stock.check_potential_eligibility()
+            is_base = stock.check_base_eligibility()
+            is_potential = stock.check_potential_eligibility()
 
-            if stock.is_eligible_for_base and symbol in base_symbols_from_prev:
+            if is_base and symbol in base_symbols_from_prev:
                 base_eligible.append(stock)
-            elif stock.is_eligible_for_potential:
+            # NOT elif: mirror the full build, where a base-eligible stock that
+            # isn't selected among the top 6 remains a potential candidate. The
+            # potential pool later excludes whichever stocks are chosen as base.
+            if is_potential:
                 potential_eligible.append(stock)
 
         console.print(f"  [green]✓[/green] כשירות בסיס: {len(base_eligible)} מניות")

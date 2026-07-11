@@ -37,17 +37,17 @@ Each fund consists of **10 stocks**:
 
 ### Scoring Formula
 
-**Base Stocks (Steady Growers):**
-Each stock is scored using a **blended growth-stability model**:
+**Base Stocks — "Quality Growth at Scale" (80% of capital):**
+The larger sleeve deliberately favors durable large-cap compounders over the fastest growers: the score blends growth with R² stability and rewards size. Each stock is scored using a **blended growth-stability model**:
 - **CAGR**: 4-year compound annual growth rate over 5 fiscal years
 - **R² Stability**: Measures consistency of log-linear growth (1.0 = perfect compounder, 0 = chaotic)
 - **Blended per axis**: Net Income = 70% CAGR + 30% R²; Revenue = 70% CAGR + 30% R²
 - **Final score**: 40% NI blended + 35% Revenue blended + 25% Market cap (rank-percentile)
 
-**Potential Stocks (High Growth):**
+**Potential Stocks (High Growth, 20% of capital):**
 Growth-focused ranking (no stability blend):
-- **Future Growth**: 80% (3-year CAGR)
-- **Momentum**: 20% (1-year price change)
+- **Future Growth**: 80% (historical **2-year** net-income CAGR over 3 data points — backward-looking, not a forecast)
+- **Momentum**: 20% (~12-month price change; the reference price is the snapshot closest to one year before the latest snapshot, so the window is consistent across stocks)
 
 *(PE/Valuation excluded — high-growth stocks naturally carry PE premiums; penalizing P/E would systematically disadvantage the stocks this model targets)*
 

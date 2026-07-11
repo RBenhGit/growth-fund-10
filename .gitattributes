@@ -1,0 +1,18 @@
+# Normalize all text files to LF, in the repo and in the working tree.
+# HEAD already stores LF; this prevents the CRLF churn that a Windows or
+# Google-Drive checkout was introducing (every line showing as "modified").
+* text=auto eol=lf
+
+# Binary assets — never apply line-ending conversion.
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.xlsx binary
+*.xls binary
+*.docx binary
+*.doc binary
+*.pptx binary
+*.zip binary

@@ -26,7 +26,18 @@
       "Bash(git mv:*)",
       "Bash(wc:*)",
       "Bash(mv \"logs/data_failures_SP500_QQ1_2026.json\" \"logs/data_failures_SP500_Q1_2026.json\")",
-      "Bash(mv \"logs/data_failures_TASE125_QQ1_2026.json\" \"logs/data_failures_TASE125_Q1_2026.json\")"
+      "Bash(mv \"logs/data_failures_TASE125_QQ1_2026.json\" \"logs/data_failures_TASE125_Q1_2026.json\")",
+      "Bash(python -m pytest tests/test_models.py tests/test_quarterly_update.py tests/test_builder.py -q)",
+      "Bash(python3 -c \"import pydantic, dotenv\")",
+      "Bash(pip3 list *)",
+      "Bash(python3 -m pip --version)",
+      "Bash(python3 -m py_compile models/stock.py models/financial_data.py models/fund.py fund_builder/builder.py fund_builder/updater.py utils/ltm_calculator.py tools/demonstrate_calculations.py tests/test_models.py tests/test_quarterly_update.py)",
+      "Bash(grep -rln \"oldest_price\\\\|since.*oldest\\\\|70%\\\\|Valuation: 10\\\\|valuation.*10\\\\|2 years for potential\\\\|3-year CAGR\\\\|calculate_lcm\" Fund_Docs/Reports/)",
+      "Bash(grep -rln \"momentum\\\\|Momentum\\\\|מומנטום\" Fund_Docs/Reports/)",
+      "Bash(python3 -m venv testenv)",
+      "Bash(./testenv/bin/pip install *)",
+      "Bash(./testenv/bin/python -c \"import pydantic, dotenv, rich, pytest; print\\('deps OK', pydantic.__version__\\)\")",
+      "Bash(/tmp/claude-1000/-home-rbh-home-Desktop-finance-----------10/a9fc7c06-6de0-4bc1-b7a6-a12736e31b12/scratchpad/testenv/bin/python -m pytest tests/test_models.py tests/test_quarterly_update.py tests/test_builder.py -q)"
     ],
     "deny": [],
     "ask": []

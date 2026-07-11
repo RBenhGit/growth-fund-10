@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-07-10T23:53:32.238351",
+  "index": "TASE125",
+  "quarter": "Q3",
+  "year": 2026,
+  "total_constituents": 117,
+  "loaded": 107,
+  "failed": 2,
+  "failures": {
+    "not_found": [],
+    "api_error": [],
+    "financial_validation": [],
+    "pricing_validation": [
+      {
+        "symbol": "ACRO.TA",
+        "name": "Kvutzat Acro Ltd.",
+        "reason": "Invalid pricing data (see logs for details)"
+      },
+      {
+        "symbol": "NXSN.TA",
+        "name": "Next Vision Stabilized Systems",
+        "reason": "Invalid pricing data (see logs for details)"
+      }
+    ]
+  }
+}

@@ -85,6 +85,10 @@ class Stock(BaseModel):
         Returns:
             bool: True אם המניה כשירה
         """
+        # תמיד מאפסים תחילה — כך בדיקה חוזרת (למשל בעדכון רבעוני על אובייקט
+        # מ-cache שכבר סומן ככשיר) יכולה לשלול כשירות ולא רק לאשר אותה.
+        self.is_eligible_for_base = False
+
         if not self.financial_data:
             return False
 
@@ -92,15 +96,25 @@ class Stock(BaseModel):
         if not self.financial_data.has_profitable_years(min_profitable_years):
             return False
 
-        # 2. יציבות תפעולית - 4 מתוך 5 שנים
+        # 2. נדרשת היסטוריית הכנסות מספקת לחישוב ה-CAGR של הציון,
+        #    אחרת סדרה קצרה תניב צמיחת הכנסות 0.0 ותדורג מעל מניה שדעכה בפועל.
+        if len(self.financial_data.revenues) < min_profitable_years:
+            return False
+
+        # 3. יציבות תפעולית - 4 מתוך 5 שנים
         if not self.financial_data.has_operating_profit_years(min_operating_profit_years, min_profitable_years):
             return False
 
-        # 3. תזרים מזומנים חיובי
+        # 4. תזרים מזומנים חיובי
         if not self.financial_data.has_positive_cash_flow():
             return False
 
-        # 4. יחס חוב/הון
+        # 5. הון עצמי שלילי/אפס הוא דגל אדום שיחס חוב/הון מסתיר
+        #    (הוא מחזיר None כאשר ההון ≤ 0, מה שהיה עובר בשקט).
+        if self.financial_data.total_equity is not None and self.financial_data.total_equity <= 0:
+            return False
+
+        # 6. יחס חוב/הון
         debt_ratio = self.financial_data.debt_to_equity_ratio
         if debt_ratio is not None and debt_ratio > max_debt_to_equity:
             return False
@@ -125,6 +139,9 @@ class Stock(BaseModel):
             has_profitable_years בודקת את השנים האחרונות ביותר (most recent),
             ולא רק שיש 3 שנים כלשהן עם רווח.
         """
+        # תמיד מאפסים תחילה — מאפשר לבדיקה חוזרת לשלול כשירות (ראה check_base_eligibility).
+        self.is_eligible_for_potential = False
+
         if not self.financial_data:
             return False
 

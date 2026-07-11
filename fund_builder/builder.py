@@ -7,7 +7,6 @@ from models import Stock, Fund, FundPosition
 from config import settings
 import math
 import logging
-from functools import reduce
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +54,11 @@ class FundBuilder:
             return None
 
         # CAGR formula: ((end_value / start_value) ^ (1 / period)) - 1
-        # Use explicit (years - 1) as period to ensure a consistent annualization
-        # regardless of calendar year gaps (e.g. after LTM merging adds a non-consecutive year).
-        # With years=5 this always computes a 4-year CAGR.
+        # period = (data points − 1), so with years=5 this is always a 4-year CAGR
+        # over 5 points. Note: it annualizes by data-point count, not by elapsed
+        # calendar years, so a gap in the series would inflate the rate. The quarterly
+        # update overwrites the most recent annual slot with the LTM value
+        # (see utils/ltm_calculator.py) precisely to keep this 5-point window intact.
         try:
             period = years - 1
             if period <= 0:
@@ -204,7 +205,9 @@ class FundBuilder:
         if not stock.financial_data or not stock.market_data:
             return {"future_growth": 0.0, "momentum": 0.0}
 
-        # צמיחה עתידית (3 נקודות נתונים → CAGR של 2 שנים, מונע עיוות מאירועים חד-פעמיים)
+        # "צמיחה עתידית" = CAGR היסטורי של רווח נקי על פני 2 שנים (3 נקודות נתונים).
+        # הערה: זהו מדד היסטורי ולא תחזית; ומכיוון שה-CAGR מבוסס נקודות-קצה בלבד
+        # (הנקודה האמצעית אינה נקראת), אירוע חד-פעמי בשנת הבסיס או בשנה האחרונה משפיע עליו במלואו.
         future_growth = self.calculate_growth_rate(stock.financial_data.net_incomes, 3) or 0.0
 
         # מומנטום (שינוי מחיר מאז הנתון ההיסטורי הישן ביותר הזמין)
@@ -342,21 +345,6 @@ class FundBuilder:
         # מיון לפי ציון סופי
         scored_stocks.sort(key=lambda s: s.potential_score or 0, reverse=True)
         return scored_stocks
-
-    def calculate_lcm(self, numbers: List[int]) -> int:
-        """
-        חישוב המכפלה המשותפת הקטנה ביותר
-
-        Args:
-            numbers: רשימת מספרים
-
-        Returns:
-            int: LCM
-        """
-        def lcm(a, b):
-            return abs(a * b) // math.gcd(a, b)
-
-        return reduce(lcm, numbers)
 
     def calculate_minimum_fund_cost(self, positions: List[Tuple[Stock, float]]) -> Tuple[float, Dict[str, int]]:
         """

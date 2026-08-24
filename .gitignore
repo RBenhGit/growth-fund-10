@@ -63,3 +63,7 @@ geckodriver
 # Debug artifacts
 login_page_debug.png
 fresh_*.json
+
+# Ad hoc skill output (stock-financials-chart / stock-snapshot default filenames)
+*_financials_chart.html
+*_snapshot.html

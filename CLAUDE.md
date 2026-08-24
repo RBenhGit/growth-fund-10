@@ -41,6 +41,50 @@ python build_fund.py --index SP500 --update --dry-run
 python build_fund.py --index SP500 --quarter Q2 --year 2026 --update
 ```
 
+### Deploying to Google Drive (without rebuilding)
+```bash
+# Push already-generated docs for a quarter to Google Drive (no API credits)
+python build_fund.py --index SP500 --quarter Q3 --year 2026 --deploy-only
+
+# Push the newest quarter of both indexes
+./scripts/run_fund.sh deploy
+
+# Push EVERYTHING — full mirror including historical quarters
+./scripts/run_fund.sh deploy-all
+```
+Deployment also runs automatically at the end of every build and every `--update`.
+See the `utils/deploy.py` entry under Utilities for the backend selection rules.
+
+### Global Commands (run from any directory)
+
+Four wrappers around `build_fund.py`, installed as symlinks in `~/.local/bin`:
+
+```bash
+./scripts/install_commands.sh            # install / update the symlinks (idempotent)
+./scripts/install_commands.sh --remove   # uninstall
+
+fund-build-tase        # full build, TASE125     (~45 min, ~300K credits)
+fund-update-tase       # LTM quarterly update, TASE125
+fund-build-sp500       # full build, SP500       (~45 min, ~300K credits)
+fund-update-sp500      # LTM quarterly update, SP500
+```
+
+Any unrecognised argument is passed straight through to `build_fund.py`
+(`--dry-run`, `--quarter Q3 --year 2026`, `--no-cache`, `--debug`). Two flags are consumed
+by the wrapper itself: `-y` skips the confirmation the *full* builds ask for (they're the
+expensive path; the prompt is skipped automatically when stdin isn't a TTY), and `--log`
+tees output to `logs/manual_<tag>_<timestamp>.log` — without it, output goes straight to the
+terminal so Rich keeps its live progress bars.
+
+- [scripts/_fund_lib.sh](scripts/_fund_lib.sh) — shared logic: resolves `PROJECT_ROOT` via
+  `readlink -f` (so it works through the `~/.local/bin` symlink from any cwd), sets UTF-8 for
+  Hebrew output, prefers `venv/bin/python`.
+- [scripts/install_commands.sh](scripts/install_commands.sh) — symlink installer; warns if
+  `~/.local/bin` isn't on `PATH`.
+
+These are for manual runs. `scripts/run_fund.sh` remains the cron entry point and covers
+both indexes per invocation.
+
 ### Testing Data Sources
 ```bash
 # Run comprehensive data source tests
@@ -52,13 +96,81 @@ python tests/test_all_sources.py
 pip install -r requirements.txt
 ```
 
-## Automated Scheduling (Windows Task Scheduler)
+## Automated Scheduling
 
-The fund builder can run on a fully automated annual schedule aligned with earnings seasons. The system is configured to:
+The fund builder runs on an automated annual schedule aligned with earnings seasons:
 - **Feb 25**: Full rebuild of both indexes (SP500 + TASE125) + follow-up LTM update
 - **May 25, Aug 25, Nov 25**: Quarterly LTM updates only
 
-**For detailed setup and monitoring instructions, see [SCHEDULING.md](SCHEDULING.md).**
+Every run deploys to Google Drive on completion.
+
+### Linux (cron) — CURRENT production setup
+
+The machine this repo runs on is Linux, so **cron is the live scheduler**. The Windows Task
+Scheduler section below is legacy and does not run here.
+
+```bash
+./scripts/install_cron.sh            # install or update (idempotent, no sudo)
+./scripts/install_cron.sh --remove   # uninstall
+crontab -l                           # inspect
+```
+
+Installed entries:
+
+| Schedule | Command | Purpose | Cost |
+|---|---|---|---|
+| Feb 25, 07:00 | `run_fund.sh full` | Full rebuild of both indexes + LTM update | ~2h, ~600K credits |
+| May/Aug/Nov 25, 07:00 | `run_fund.sh update` | LTM update only | ~10 min, ~60K credits |
+| Daily, 07:30 | `run_fund.sh deploy` | Catch-up sync to Google Drive | Free (no financial API calls) |
+
+The **daily deploy job is what makes deployment self-healing**. `rclone` skips files that are
+already in sync, so a normal day is a cheap no-op; but if a deploy ever failed (expired token,
+network outage, a build that ran while Drive was unreachable), the next daily run completes it
+with no manual step. It deploys the *latest existing quarter* per index, found via
+`find_latest_fund_dir()`.
+
+**Implementation:**
+- [scripts/run_fund.sh](scripts/run_fund.sh) — execution wrapper; modes `full` | `update` | `deploy`. Sets `PYTHONIOENCODING=utf-8` and `LANG` explicitly because cron runs with a minimal environment that would otherwise break Hebrew output. Activates `venv/` if present. Logs to `logs/scheduled_YYYY-MM-DD.log`.
+- [scripts/deploy_latest.py](scripts/deploy_latest.py) — deploys the newest quarter of each index; exit 1 if any index fails. With `--all`, deploys the **entire** `Fund_Docs` tree instead — every quarter plus `Gemini/` and `Reports/`. Folders with a space in the name (e.g. `Q2_2026 - Copy`) are skipped as manual copies. `--all` exists because routine deployment only ever touches the *current* quarter, so historical quarters produced before deployment was working — Q4 2025, in this repo — would otherwise never reach Drive.
+- [scripts/install_cron.sh](scripts/install_cron.sh) — idempotent crontab management via `# >>> FundBuilder (managed) >>>` markers; leaves any other crontab entries untouched.
+
+**Monitoring:**
+```bash
+cat logs/deploy_status.txt          # one line: is the Drive sync healthy?
+tail -50 logs/scheduled_$(date +%F).log
+grep -l "COMPLETED WITH ERRORS" logs/scheduled_*.log
+```
+
+`logs/deploy_status.txt` is rewritten on every deploy attempt with a timestamp and `OK` /
+`FAILED`. It exists because a cron failure otherwise only lands in a dated log file nobody
+opens — a silently broken sync is exactly the failure mode this whole subsystem was built
+to eliminate.
+
+**Authorising rclone (one-time, requires a human):**
+
+Google OAuth requires interactive consent and **cannot be automated** — this is the single
+manual step in the whole pipeline. One command does consent, verification, and the first
+deploy:
+
+```bash
+./scripts/authorize_drive.sh
+```
+
+[scripts/authorize_drive.sh](scripts/authorize_drive.sh) reads the remote name from `.env`
+(so it never drifts from the deploy config), skips the consent step if already authorised,
+then verifies reachability, deploys, and prints the resulting Drive tree.
+
+Headless / over SSH: answer `n` to the browser prompt. rclone prints an
+`rclone authorize "drive" "<blob>"` command to run on any machine that *does* have a
+browser; paste the result back. **No display is needed on the server.**
+
+Re-authorisation is only needed if the token is revoked (Google password change, app access
+revoked). `logs/deploy_status.txt` will read `FAILED` if that happens.
+
+### Windows (Task Scheduler) — legacy
+
+> Retained for reference only. These PowerShell scripts assume paths under `d:\python\finance\`
+> and do not run on the current Linux host.
 
 ### Setup (One-time)
 
@@ -188,7 +300,12 @@ Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -
   - `get_fund_output_dir()` - Returns `Fund_Docs/{INDEX}/{Q}_{YEAR}/` path
   - `find_latest_fund_dir()` - Scans for most recent quarter folder
   - `find_previous_fund_dir()` - Finds the quarter folder before the current one
-- [utils/deploy.py](utils/deploy.py) - Copies generated `.md` files to a Google Drive local mount after each build or update. Silently skipped if `GOOGLE_DRIVE_DEPLOY_PATH` is not set in `.env`. Called by both `build_fund.py` and `fund_builder/updater.py`.
+- [utils/deploy.py](utils/deploy.py) - Copies generated `.md` files to Google Drive after each build or update. Called by both `build_fund.py` and `fund_builder/updater.py`. Two backends, checked in order:
+  - `GOOGLE_DRIVE_RCLONE_REMOTE` (e.g. `Home_Computer:Fund_10`) → `rclone copy`. **This is the backend used on Linux** — it works headless from cron/systemd with no mounted filesystem.
+  - `GOOGLE_DRIVE_DEPLOY_PATH` → plain `shutil.copy2` into a locally-mounted Drive folder (Drive for Desktop on Windows, or an `rclone mount`).
+  - Neither set → silent no-op.
+  - Returns `bool`; a failed deploy is **non-fatal** (a full build costs ~2h / ~600K credits) but is reported as a red `✗ Google Drive deploy FAILED` panel, never as success. Re-run just the deploy with `--deploy-only`.
+  - The local backend validates before writing: rejects relative paths, rejects a Windows `C:\...` path on non-Windows, and requires the parent directory to already exist. Without this, `Path("C:\\Users\\...")` on Linux is a *relative* path and `mkdir(parents=True)` silently creates a stray folder inside the repo while reporting success.
 
 **Scheduling & Automation (Windows Task Scheduler):**
 - [scripts/run_fund.ps1](scripts/run_fund.ps1) - PowerShell wrapper that executes fund builds/updates
@@ -203,6 +320,10 @@ Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -
 
 ### Directory Structure
 ```
+├── .claude/
+│   └── skills/                         # Ad hoc Claude Code lookup tools (see below)
+│       ├── stock-financials-chart/     # Ticker financial trend chart
+│       └── stock-snapshot/             # Ticker fund eligibility + score + chart
 ├── build_fund.py           # Main entry point (full build + --update)
 ├── backtest.py             # Backtesting engine
 ├── config/
@@ -232,8 +353,11 @@ Unregister-ScheduledTask -TaskName "FundBuild_Feb25" -TaskPath "\FundBuilder\" -
 │   ├── deploy.py               # Google Drive deployment: copies .md files after each build
 │   └── migrate_fund_docs.py    # One-time folder migration
 ├── scripts/
-│   ├── run_fund.ps1            # Execution wrapper (called by scheduled tasks)
-│   └── schedule_tasks.ps1      # Task registration (run as Admin one-time to set up)
+│   ├── run_fund.sh             # Linux execution wrapper: full | update | deploy  (CURRENT)
+│   ├── deploy_latest.py        # Deploys newest quarter per index to Google Drive (CURRENT)
+│   ├── install_cron.sh         # Idempotent cron installer, no sudo               (CURRENT)
+│   ├── run_fund.ps1            # Windows execution wrapper                        (legacy)
+│   └── schedule_tasks.ps1      # Windows Task Scheduler registration              (legacy)
 ├── tests/
 │   ├── test_all_sources.py
 │   ├── test_quarterly_update.py
@@ -611,6 +735,52 @@ Potential stocks have relaxed criteria:
 
 **Important**: During a full build (`python build_fund.py --index ...`), stock data is ALWAYS fetched fresh from APIs. Cache files are saved for debugging and manual analysis but are never loaded. The quarterly update (`--update` flag) is the exception: it intentionally loads cached `Stock` objects from `cache/stocks_data/` to avoid re-fetching the full index.
 
+## Claude Code Skills
+
+Two ad hoc, cache-only lookup tools live under `.claude/skills/` for inspecting a single
+ticker without running (or waiting on) a build. Both read directly from
+`cache/stocks_data/{TICKER}_US.json` / `_TA.json` — no API calls, no network cost — and
+publish a self-contained HTML Artifact. They're invoked conversationally in Claude Code
+("show me PLTR's chart", "is MTRX eligible for the fund") or run directly from the shell.
+
+### `stock-financials-chart`
+
+[`.claude/skills/stock-financials-chart/scripts/generate_chart.py`](.claude/skills/stock-financials-chart/scripts/generate_chart.py)
+renders a grouped bar chart (zero baseline, hover tooltips, dark/light theme, "Show data
+table" toggle) of one stock's Revenue, Net Income, Operating Income, and Operating Cash Flow
+across every fiscal year in its cache file. Currency (`$`/USD vs `₪`/NIS) and unit scaling
+(millions vs. billions) are picked automatically.
+
+```bash
+python3 .claude/skills/stock-financials-chart/scripts/generate_chart.py PLTR --output PLTR_chart.html
+```
+
+### `stock-snapshot`
+
+[`.claude/skills/stock-snapshot/scripts/generate_snapshot.py`](.claude/skills/stock-snapshot/scripts/generate_snapshot.py)
+composes a Fund Status card on top of the same chart (imported directly from
+`stock-financials-chart`, not duplicated) showing:
+- **Eligibility, recomputed live** — calls `Stock.check_base_eligibility()` /
+  `check_potential_eligibility()` fresh against the cached fundamentals rather than trusting
+  the cache's stored `is_eligible_for_*` flag, since that flag can be stale relative to the
+  current eligibility rules (see "Eligibility is re-evaluated, not just granted" above). A
+  per-criterion breakdown table shows why each axis passes or fails; a mismatch against the
+  stored flag is surfaced as a note, not silently overwritten.
+- **Score breakdown, as stored** — `base_score`/`potential_score` and their
+  `*_scores_detail` sub-values (CAGR, stability R², percentile ranks, weighted contributions)
+  from the last full build or quarterly update, using the live weight constants from
+  `config/settings.py`. This is deliberately **not** recomputed live — the percentile ranks
+  are only meaningful relative to the full candidate pool scored together in that run, which
+  a single ticker's cache file can't reproduce on its own.
+
+```bash
+python3 .claude/skills/stock-snapshot/scripts/generate_snapshot.py PLTR --output PLTR_snapshot.html
+```
+
+Both scripts exit 1 with a clear message (never a stack trace) if the ticker has no cache
+file, or if the file has no usable financial data — meaning the ticker was never fetched into
+`cache/stocks_data/` by a prior full build, not a bug in the skill.
+
 ## Configuration
 
 Create a `.env` file in the project root (see [.env.template](.env.template) for full template):
@@ -663,10 +833,26 @@ DEBUG_MODE=false
 # ====================================================================
 # Google Drive Deployment (optional)
 # ====================================================================
-GOOGLE_DRIVE_DEPLOY_PATH=  # Local Google Drive path, e.g. C:\Users\ranbe\My Drive\Fund_10
-                           # If set, .md files are copied here after every build/update
-                           # Silently skipped if not configured
+# Backend 1 (recommended, required on Linux): rclone remote + path.
+# One-time authorisation: rclone config reconnect Home_Computer:
+GOOGLE_DRIVE_RCLONE_REMOTE=Home_Computer:Fund_10
+
+# Backend 2: local path where a Drive client exposes the folder.
+# Must be ABSOLUTE and already exist. Windows-only in practice.
+GOOGLE_DRIVE_DEPLOY_PATH=  # e.g. C:\Users\ranbe\My Drive\Fund_10
+
+# If both are set, GOOGLE_DRIVE_RCLONE_REMOTE wins.
+# If neither is set, deployment is silently skipped.
 ```
+
+**Deploying without rebuilding:**
+
+```bash
+# Push existing docs for a quarter to Drive — no API credits, exit 1 on failure
+python build_fund.py --index SP500 --quarter Q3 --year 2026 --deploy-only
+```
+
+Use this to backfill a quarter whose deploy failed, or to re-sync after fixing credentials. It skips `validate_settings()` since no data source is touched.
 
 ### Legacy Configuration (Backwards Compatible)
 

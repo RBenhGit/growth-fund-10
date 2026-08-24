@@ -13,6 +13,7 @@ An automated system for building and managing investment portfolios based on sto
 - [Automated Scheduling](#-automated-scheduling)
 - [Backtesting](#backtesting)
 - [Testing Data Sources](#testing-data-sources)
+- [Ad Hoc Ticker Lookup](#-ad-hoc-ticker-lookup-claude-code)
 - [Project Structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 
@@ -319,10 +320,33 @@ Tests:
 - Israeli stocks (TEVA.TA, NICE.TA)
 - Router source selection
 
+## 🔍 Ad Hoc Ticker Lookup (Claude Code)
+
+Two lightweight tools under `.claude/skills/` let you inspect a single ticker straight from
+the cache — no API calls, no rebuild — either by asking Claude Code conversationally
+("show me PLTR's chart", "is MTRX eligible for the fund") or by running them directly:
+
+```bash
+# Financial trend chart: Revenue, Net Income, Operating Income, Operating Cash Flow
+python3 .claude/skills/stock-financials-chart/scripts/generate_chart.py PLTR --output PLTR_chart.html
+
+# Fund status: eligibility (recomputed live) + score breakdown + the same chart
+python3 .claude/skills/stock-snapshot/scripts/generate_snapshot.py PLTR --output PLTR_snapshot.html
+```
+
+Both write a self-contained HTML file you can open in any browser. They only work for
+tickers already in `cache/stocks_data/` (i.e. ones seen by a prior full build or update) —
+see [CLAUDE.md](CLAUDE.md#claude-code-skills) for details on what each shows and how
+eligibility vs. score freshness differs between them.
+
 ## 📁 Project Structure
 
 ```
 קרן צמיחה 10/
+├── .claude/
+│   └── skills/                     # Ad hoc ticker lookup tools (see above)
+│       ├── stock-financials-chart/ # Ticker financial trend chart
+│       └── stock-snapshot/         # Ticker fund eligibility + score + chart
 ├── build_fund.py              # Main entry point (full build + --update)
 ├── backtest.py                # Backtesting engine
 ├── config/
